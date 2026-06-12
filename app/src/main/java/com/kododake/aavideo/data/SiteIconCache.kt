@@ -1,4 +1,4 @@
-package com.kododake.aabrowser.data
+package com.kododake.aavideo.data
 
 import android.content.Context
 import android.graphics.Bitmap

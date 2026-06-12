@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">AABrowser</string>
-    <string name="app_credit">AABrowser — by Kododake</string>
+    <string name="app_name">AAVideo</string>
+    <string name="app_credit">AAVideo — by Kododake</string>
     <string name="author_name">Kododake</string>
-    <string name="menu_title">AABrowser</string>
+    <string name="menu_title">AAVideo</string>
     <string name="menu_close">Close</string>
     <string name="menu_address_label">Address or search</string>
     
@@ -117,7 +117,7 @@
     <string name="settings_start_page_choose_background">Choose background</string>
     <string name="settings_start_page_clear_background">Clear background</string>
     <string name="settings_user_agent">User agent</string>
-    <string name="settings_user_agent_description">Choose how AABrowser identifies itself when loading pages.</string>
+    <string name="settings_user_agent_description">Choose how AAVideo identifies itself when loading pages.</string>
     <string name="settings_user_agent_android">Android Chrome (default)</string>
     <string name="settings_user_agent_android_subtitle">Mobile: Android Chrome. Desktop mode uses Windows Chrome UA.</string>
     <string name="settings_user_agent_safari">Safari (iOS/macOS)</string>
@@ -166,7 +166,7 @@
     <string name="menu_start_page_add_current">Add current page to start page</string>
     <string name="menu_home_page_set_current">Set current page as home page</string>
     <string name="start_page_title">Start Page</string>
-    <string name="start_page_headline">AABrowser</string>
+    <string name="start_page_headline">AAVideo</string>
     <string name="start_page_subtitle">Quick access for the sites you use most.</string>
     <string name="start_page_card_title">Quick Links</string>
     <string name="start_page_card_subtitle">Pin up to six sites from the bookmarks menu.</string>
@@ -214,4 +214,8 @@
     <string name="media_notification_channel_name">Media playback</string>
     <string name="media_notification_channel_description">Controls media playback in web pages</string>
     <string name="media_notification_content_text">Playing media in WebView</string>
+
+    <!-- Ad Blocking -->
+    <string name="settings_ad_block">Ad Blocking</string>
+    <string name="settings_ad_block_description">Block ads on websites, including YouTube.</string>
 </resources>

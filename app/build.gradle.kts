@@ -10,11 +10,11 @@ plugins {
 }
 
 android {
-    namespace = "com.kododake.aabrowser"
+    namespace = "com.kododake.aavideo"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.kododake.aabrowser"
+        applicationId = "com.kododake.aavideo"
         minSdk = 35
         targetSdk = 36
         versionCode = 7
@@ -51,7 +51,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile?.exists() == true) {
+                releaseSigning
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
@@ -68,7 +73,7 @@ android {
     androidComponents {
         onVariants { variant ->
             val vNameStr = android.defaultConfig.versionName ?: "unknown"
-            val appNameStr = "AABrowser"
+            val appNameStr = "AAVideo"
             val isDebug = variant.buildType == "debug"
             val debugSuffixStr = if (isDebug) "_debug" else ""
 

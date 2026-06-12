@@ -1,4 +1,4 @@
-package com.kododake.aabrowser
+package com.kododake.aavideo
 
 import android.content.Intent
 import android.net.Uri
@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.util.Patterns
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.kododake.aabrowser.data.BrowserPreferences
+import com.kododake.aavideo.data.BrowserPreferences
 
 class ShareBookmarkActivity : AppCompatActivity() {
 

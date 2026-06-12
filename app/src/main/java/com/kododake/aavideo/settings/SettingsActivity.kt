@@ -1,11 +1,11 @@
-package com.kododake.aabrowser.settings
+package com.kododake.aavideo.settings
 
 import android.content.Context
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import com.kododake.aabrowser.data.BrowserPreferences
-import com.kododake.aabrowser.databinding.ActivitySettingsBinding
+import com.kododake.aavideo.data.BrowserPreferences
+import com.kododake.aavideo.databinding.ActivitySettingsBinding
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var binding: ActivitySettingsBinding

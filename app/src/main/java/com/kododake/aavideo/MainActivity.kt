@@ -1,4 +1,4 @@
-package com.kododake.aabrowser
+package com.kododake.aavideo
 
 import android.Manifest
 import android.content.Context
@@ -31,7 +31,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
-import com.kododake.aabrowser.analytics.UmamiTracker
+import com.kododake.aavideo.analytics.UmamiTracker
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
@@ -47,18 +47,23 @@ import androidx.core.view.updatePadding
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import com.kododake.aabrowser.data.BrowserPreferences
-import com.kododake.aabrowser.data.SiteIconCache
-import com.kododake.aabrowser.databinding.ActivityMainBinding
-import com.kododake.aabrowser.model.QuickActionButtonMode
-import com.kododake.aabrowser.model.QuickActionButtonPosition
-import com.kododake.aabrowser.model.UserAgentProfile
-import com.kododake.aabrowser.web.BrowserCallbacks
-import com.kododake.aabrowser.web.configureWebView
-import com.kododake.aabrowser.web.releaseCompletely
-import com.kododake.aabrowser.web.updateDesktopMode
-import com.kododake.aabrowser.web.updatePageDarkening
-import com.kododake.aabrowser.web.updateUserAgentProfile
+import com.kododake.aavideo.data.BrowserPreferences
+import com.kododake.aavideo.data.SiteIconCache
+import com.kododake.aavideo.databinding.ActivityMainBinding
+import com.kododake.aavideo.model.QuickActionButtonMode
+import com.kododake.aavideo.model.QuickActionButtonPosition
+import com.kododake.aavideo.model.UserAgentProfile
+import com.kododake.aavideo.web.BrowserCallbacks
+import com.kododake.aavideo.web.configureWebView
+import com.kododake.aavideo.web.releaseCompletely
+import com.kododake.aavideo.web.updateDesktopMode
+import com.kododake.aavideo.web.updatePageDarkening
+import com.kododake.aavideo.web.updateUserAgentProfile
+import com.kododake.aavideo.web.updateAdBlock
+import com.kododake.aavideo.web.isYouTubeTvUrl
+import com.kododake.aavideo.web.applyYouTubeTvUserAgent
+import com.kododake.aavideo.web.restoreDefaultUserAgent
+import com.kododake.aavideo.web.YOUTUBE_TV_USER_AGENT
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.textview.MaterialTextView
@@ -66,16 +71,17 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.common.BitMatrix
 import android.widget.RadioGroup
-import com.kododake.aabrowser.settings.SettingsViews
+import com.kododake.aavideo.settings.SettingsViews
 import org.woheller69.freeDroidWarn.R as FreeDroidWarnR
 
 class MainActivity : AppCompatActivity() {
     private data class BrowserTab(
         val id: Long,
         val webView: android.webkit.WebView,
-        val speechBridge: com.kododake.aabrowser.web.SpeechRecognitionBridge,
+        val speechBridge: com.kododake.aavideo.web.SpeechRecognitionBridge,
         var currentUrl: String = "",
-        var currentTitle: String = ""
+        var currentTitle: String = "",
+        var isPlaying: Boolean = false
     )
 
     private lateinit var binding: ActivityMainBinding
@@ -125,6 +131,254 @@ class MainActivity : AppCompatActivity() {
     private var loadedStartPageBackgroundBitmap: Bitmap? = null
     private var cachedStartPageGradientSignature: Int = 0
 
+    private var mediaSession: android.media.session.MediaSession? = null
+
+    private fun updateMediaSessionState(isPlaying: Boolean) {
+        val stateBuilder = android.media.session.PlaybackState.Builder()
+        if (isPlaying) {
+            stateBuilder.setState(
+                android.media.session.PlaybackState.STATE_PLAYING,
+                android.media.session.PlaybackState.PLAYBACK_POSITION_UNKNOWN,
+                1.0f
+            )
+        } else {
+            stateBuilder.setState(
+                android.media.session.PlaybackState.STATE_PAUSED,
+                android.media.session.PlaybackState.PLAYBACK_POSITION_UNKNOWN,
+                0.0f
+            )
+        }
+        stateBuilder.setActions(
+            android.media.session.PlaybackState.ACTION_PLAY or
+            android.media.session.PlaybackState.ACTION_PAUSE or
+            android.media.session.PlaybackState.ACTION_PLAY_PAUSE or
+            android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT or
+            android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS
+        )
+        mediaSession?.setPlaybackState(stateBuilder.build())
+        showMediaNotification(isPlaying)
+    }
+
+    private fun setupMediaSession() {
+        mediaSession = android.media.session.MediaSession(this, "AABrowserMediaSession").apply {
+            setCallback(object : android.media.session.MediaSession.Callback() {
+                override fun onPlay() {
+                    super.onPlay()
+                    runOnUiThread {
+                        webView?.evaluateJavascript(
+                            "(function(){ var v=document.querySelector('video,audio'); if(v) v.play(); })()",
+                            null
+                        )
+                    }
+                    updateMediaSessionState(true)
+                }
+
+                override fun onPause() {
+                    super.onPause()
+                    runOnUiThread {
+                        webView?.evaluateJavascript(
+                            "(function(){ var v=document.querySelector('video,audio'); if(v) v.pause(); })()",
+                            null
+                        )
+                    }
+                    updateMediaSessionState(false)
+                }
+
+                override fun onSkipToNext() {
+                    super.onSkipToNext()
+                    runOnUiThread {
+                        val view = webView
+                        if (view != null) {
+                            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT))
+                            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT))
+                            
+                            view.evaluateJavascript(
+                                """
+                                (function() {
+                                    var p = document.querySelector('.html5-video-player') || document.getElementById('movie_player');
+                                    if (p && typeof p.nextVideo === 'function') {
+                                        p.nextVideo();
+                                        return;
+                                    }
+                                    var selectors = ['.ytp-next-button', '.yt-spec-button-shape-next', '[aria-label*="Next" i]', '[class*="next" i]', '[id*="next" i]', '.transport-controls .next-button', '.next-button', '.player-controls-next', '.ytp-button-next'];
+                                    for (var i = 0; i < selectors.length; i++) {
+                                        var btn = document.querySelector(selectors[i]);
+                                        if (btn) {
+                                            btn.click();
+                                        }
+                                    }
+                                    function sendKey(key, code, keyCode, shift) {
+                                        var target = document.activeElement || document.body || document;
+                                        var init = {
+                                            key: key,
+                                            code: code,
+                                            keyCode: keyCode,
+                                            which: keyCode,
+                                            shiftKey: !!shift,
+                                            bubbles: true,
+                                            cancelable: true,
+                                            view: window
+                                        };
+                                        target.dispatchEvent(new KeyboardEvent('keydown', init));
+                                        target.dispatchEvent(new KeyboardEvent('keyup', init));
+                                    }
+                                    sendKey('n', 'KeyN', 78, false);
+                                    sendKey('N', 'KeyN', 78, true);
+                                    sendKey('MediaTrackNext', 'MediaTrackNext', 176, false);
+                                })();
+                                """.trimIndent(),
+                                null
+                            )
+                        }
+                    }
+                }
+
+                override fun onSkipToPrevious() {
+                    super.onSkipToPrevious()
+                    runOnUiThread {
+                        val view = webView
+                        if (view != null) {
+                            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+                            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+                            
+                            view.evaluateJavascript(
+                                """
+                                (function() {
+                                    var p = document.querySelector('.html5-video-player') || document.getElementById('movie_player');
+                                    if (p && typeof p.previousVideo === 'function') {
+                                        p.previousVideo();
+                                        return;
+                                    }
+                                    var selectors = ['.ytp-prev-button', '.yt-spec-button-shape-prev', '[aria-label*="Prev" i]', '[class*="prev" i]', '[id*="prev" i]', '.transport-controls .prev-button', '.prev-button', '.player-controls-prev', '.ytp-button-prev'];
+                                    for (var i = 0; i < selectors.length; i++) {
+                                        var btn = document.querySelector(selectors[i]);
+                                        if (btn) {
+                                            btn.click();
+                                        }
+                                    }
+                                    function sendKey(key, code, keyCode, shift) {
+                                        var target = document.activeElement || document.body || document;
+                                        var init = {
+                                            key: key,
+                                            code: code,
+                                            keyCode: keyCode,
+                                            which: keyCode,
+                                            shiftKey: !!shift,
+                                            bubbles: true,
+                                            cancelable: true,
+                                            view: window
+                                        };
+                                        target.dispatchEvent(new KeyboardEvent('keydown', init));
+                                        target.dispatchEvent(new KeyboardEvent('keyup', init));
+                                    }
+                                    sendKey('p', 'KeyP', 80, false);
+                                    sendKey('P', 'KeyP', 80, true);
+                                    sendKey('MediaTrackPrevious', 'MediaTrackPrevious', 177, false);
+                                })();
+                                """.trimIndent(),
+                                null
+                            )
+                        }
+                    }
+                }
+            })
+            updateMediaSessionState(false)
+            isActive = true
+        }
+    }
+
+    private val CHANNEL_ID = "aabrowser_media_channel"
+    private val NOTIFICATION_ID = 9876
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "AABrowser Media Playback"
+            val descriptionText = "Controles de reproducción para AABrowser"
+            val importance = android.app.NotificationManager.IMPORTANCE_LOW
+            val channel = android.app.NotificationChannel(CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setShowBadge(false)
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showMediaNotification(isPlaying: Boolean) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val sessionToken = mediaSession?.sessionToken ?: return
+
+        val prevIntent = android.app.PendingIntent.getActivity(
+            this, 1, android.content.Intent(this, MainActivity::class.java).apply {
+                action = "com.kododake.aavideo.ACTION_PREV"
+            }, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val playPauseIntent = android.app.PendingIntent.getActivity(
+            this, 2, android.content.Intent(this, MainActivity::class.java).apply {
+                action = "com.kododake.aavideo.ACTION_PLAY_PAUSE"
+            }, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val nextIntent = android.app.PendingIntent.getActivity(
+            this, 3, android.content.Intent(this, MainActivity::class.java).apply {
+                action = "com.kododake.aavideo.ACTION_NEXT"
+            }, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val playPauseIcon = if (isPlaying) {
+            android.R.drawable.ic_media_pause
+        } else {
+            android.R.drawable.ic_media_play
+        }
+        val playPauseTitle = if (isPlaying) "Pausar" else "Reproducir"
+
+        val titleText = currentPageTitle.ifBlank { "AABrowser" }
+        val urlText = currentUrl.ifBlank { "Navegador" }
+
+        val notification = android.app.Notification.Builder(this, CHANNEL_ID)
+            .setStyle(android.app.Notification.MediaStyle()
+                .setMediaSession(sessionToken)
+                .setShowActionsInCompactView(0, 1, 2)
+            )
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(titleText)
+            .setContentText(urlText)
+            .setOngoing(isPlaying)
+            .setVisibility(android.app.Notification.VISIBILITY_PUBLIC)
+            .addAction(android.app.Notification.Action.Builder(
+                android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_media_previous), "Anterior", prevIntent
+            ).build())
+            .addAction(android.app.Notification.Action.Builder(
+                android.graphics.drawable.Icon.createWithResource(this, playPauseIcon), playPauseTitle, playPauseIntent
+            ).build())
+            .addAction(android.app.Notification.Action.Builder(
+                android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_media_next), "Siguiente", nextIntent
+            ).build())
+            .build()
+
+        notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun handleNotificationAction(intent: Intent?) {
+        intent ?: return
+        when (intent.action) {
+            "com.kododake.aavideo.ACTION_PREV" -> {
+                mediaSession?.controller?.transportControls?.skipToPrevious()
+            }
+            "com.kododake.aavideo.ACTION_PLAY_PAUSE" -> {
+                val state = mediaSession?.controller?.playbackState?.state
+                if (state == android.media.session.PlaybackState.STATE_PLAYING) {
+                    mediaSession?.controller?.transportControls?.pause()
+                } else {
+                    mediaSession?.controller?.transportControls?.play()
+                }
+            }
+            "com.kododake.aavideo.ACTION_NEXT" -> {
+                mediaSession?.controller?.transportControls?.skipToNext()
+            }
+        }
+    }
+
     override fun attachBaseContext(newBase: Context?) {
         if (newBase == null) {
             super.attachBaseContext(null)
@@ -155,11 +409,15 @@ class MainActivity : AppCompatActivity() {
         setupBackPressHandling()
         ensureNotificationPermissionIfNeeded()
         showFreeDroidWarnOnUpgradeMaterial()
+        setupMediaSession()
+        createNotificationChannel()
+        handleNotificationAction(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleNotificationAction(intent)
         extractBrowsableUrl(intent)?.let { loadUrlFromIntent(it) }
     }
 
@@ -183,6 +441,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        mediaSession?.release()
+        mediaSession = null
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        notificationManager.cancel(NOTIFICATION_ID)
         handler.removeCallbacks(autoHideMenuFab)
         handler.removeCallbacks(showMenuFabRunnable)
         exitFullscreen()
@@ -600,7 +862,45 @@ class MainActivity : AppCompatActivity() {
             return null
         }
 
-        val tabView = android.webkit.WebView(this).apply {
+        val tabView = object : android.webkit.WebView(this) {
+            private fun handleUserAgentForUrl(url: String?) {
+                if (isYouTubeTvUrl(url)) {
+                    applyYouTubeTvUserAgent()
+                } else {
+                    if (settings.userAgentString == YOUTUBE_TV_USER_AGENT) {
+                        restoreDefaultUserAgent()
+                    }
+                }
+            }
+
+            override fun loadUrl(url: String) {
+                handleUserAgentForUrl(url)
+                super.loadUrl(url)
+            }
+
+            override fun loadUrl(url: String, additionalHttpHeaders: MutableMap<String, String>) {
+                handleUserAgentForUrl(url)
+                super.loadUrl(url, additionalHttpHeaders)
+            }
+
+            override fun goBack() {
+                val backList = copyBackForwardList()
+                val targetIndex = backList.currentIndex - 1
+                if (targetIndex in 0 until backList.size) {
+                    handleUserAgentForUrl(backList.getItemAtIndex(targetIndex).url)
+                }
+                super.goBack()
+            }
+
+            override fun goForward() {
+                val backList = copyBackForwardList()
+                val targetIndex = backList.currentIndex + 1
+                if (targetIndex in 0 until backList.size) {
+                    handleUserAgentForUrl(backList.getItemAtIndex(targetIndex).url)
+                }
+                super.goForward()
+            }
+        }.apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -610,7 +910,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         lateinit var tab: BrowserTab
-        val speechBridge = com.kododake.aabrowser.web.SpeechRecognitionBridge(tabView) { pageUrl ->
+        val speechBridge = com.kododake.aavideo.web.SpeechRecognitionBridge(tabView) { pageUrl ->
             requestSpeechRecognitionMicrophoneAccess(tab.id, pageUrl)
         }
         tab = BrowserTab(
@@ -626,13 +926,14 @@ class MainActivity : AppCompatActivity() {
             callbacks = buildBrowserCallbacks(tab),
             useDesktopMode = BrowserPreferences.shouldUseDesktopMode(this),
             userAgentProfile = currentUserAgentProfile,
-            allowDarkPages = BrowserPreferences.isBetaForceDarkPagesEnabled(this)
+            allowDarkPages = BrowserPreferences.isBetaForceDarkPagesEnabled(this),
+            adBlockEnabled = BrowserPreferences.isAdBlockEnabled(this)
         )
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.addWebMessageListener(
                 tabView,
-                com.kododake.aabrowser.web.SpeechRecognitionBridge.BRIDGE_OBJECT_NAME,
+                com.kododake.aavideo.web.SpeechRecognitionBridge.BRIDGE_OBJECT_NAME,
                 setOf("*")
             ) { webView, message, sourceOrigin, isMainFrame, _ ->
                 speechBridge.handleWebMessage(
@@ -652,7 +953,26 @@ class MainActivity : AppCompatActivity() {
                     openUriExternally(safeUri)
                 }
             }
+
+            @android.webkit.JavascriptInterface
+            fun triggerBackGesture() {
+                runOnUiThread {
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
         }, "Android")
+
+        tabView.addJavascriptInterface(object {
+            @android.webkit.JavascriptInterface
+            fun onPlaybackStateChanged(isPlaying: Boolean) {
+                runOnUiThread {
+                    tab.isPlaying = isPlaying
+                    if (tab.id == activeTabId) {
+                        updateMediaSessionState(isPlaying)
+                    }
+                }
+            }
+        }, "AndroidMediaBridge")
 
         tabView.setOnTouchListener { _, _ ->
             showMenuButtonTemporarily()
@@ -794,6 +1114,8 @@ class MainActivity : AppCompatActivity() {
 
         activeTabId = selectedTab.id
         webView = selectedTab.webView
+
+        updateMediaSessionState(selectedTab.isPlaying)
 
         browserTabs.forEach { tab ->
             tab.webView.visibility = if (tab.id == selectedTab.id) View.VISIBLE else View.GONE
@@ -1738,11 +2060,14 @@ class MainActivity : AppCompatActivity() {
         val existingSlot = BrowserPreferences.findStartPageSlot(this, normalizedUrl)
         var selectedSlot = when {
             existingSlot >= 0 -> existingSlot
-            else -> slots.indexOfFirst { it.isNullOrBlank() }.takeIf { it >= 0 } ?: 0
+            else -> {
+                val userIndex = slots.subList(1, slots.size).indexOfFirst { it.isNullOrBlank() }
+                if (userIndex >= 0) userIndex else 0
+            }
         }
         val slotLabels = Array(BrowserPreferences.MAX_START_PAGE_SITES) { index ->
-            val slotLabel = getString(R.string.start_page_slot_number, index + 1)
-            val slotUrl = slots.getOrNull(index)
+            val slotLabel = getString(R.string.start_page_slot_number, index + 2)
+            val slotUrl = slots.getOrNull(index + 1)
             val summary = if (slotUrl.isNullOrBlank()) {
                 getString(R.string.start_page_slot_empty_title)
             } else {
@@ -1767,7 +2092,7 @@ class MainActivity : AppCompatActivity() {
                 refreshStartPage()
                 Toast.makeText(
                     this,
-                    getString(R.string.start_page_slot_saved, getString(R.string.start_page_slot_number, selectedSlot + 1)),
+                    getString(R.string.start_page_slot_saved, getString(R.string.start_page_slot_number, selectedSlot + 2)),
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -1838,7 +2163,7 @@ class MainActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = (12 * density).toInt() }
             }
             textContainer.addView(MaterialTextView(this).apply {
-                text = getString(R.string.start_page_slot_number, (startPageSlot + 1).coerceAtLeast(1))
+                text = getString(R.string.start_page_slot_number, startPageSlot + 2)
                 visibility = if (startPageSlot >= 0) View.VISIBLE else View.GONE
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelMedium)
                 setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
@@ -1860,7 +2185,7 @@ class MainActivity : AppCompatActivity() {
                 textContainer.addView(MaterialTextView(this).apply {
                     text = getString(
                         R.string.bookmark_start_page_badge,
-                        getString(R.string.start_page_slot_number, startPageSlot + 1)
+                        getString(R.string.start_page_slot_number, startPageSlot + 2)
                     )
                     setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
                     setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
@@ -1950,6 +2275,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun displayTitleForUrl(url: String): String {
+        if (isYouTubeTvUrl(url)) {
+            return "YouTube TV"
+        }
         val host = runCatching { java.net.URI(url).host?.lowercase() }.getOrNull().orEmpty()
         val normalizedHost = host.removePrefix("www.").removePrefix("m.")
         val mappedTitle = when (normalizedHost) {
@@ -2274,7 +2602,7 @@ class MainActivity : AppCompatActivity() {
         container.removeAllViews()
 
         val slots = BrowserPreferences.getStartPageSlots(this)
-        val rows = (BrowserPreferences.MAX_START_PAGE_SITES + 1) / 2
+        val rows = (slots.size + 1) / 2
         repeat(rows) { rowIndex ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -2475,12 +2803,17 @@ class MainActivity : AppCompatActivity() {
             val contentView = SettingsViews.createSettingsContent(
                 context = this,
                 includeDragHandle = false,
-                callbacks = com.kododake.aabrowser.settings.SettingsCallbacks(
+                callbacks = com.kododake.aavideo.settings.SettingsCallbacks(
                     onClose = { hideSettingsView() },
                     onThemeChanged = { recreate() },
                     onPageDarkeningChanged = {
                         browserTabs.forEach { tab ->
                             tab.webView.updatePageDarkening(BrowserPreferences.isBetaForceDarkPagesEnabled(this))
+                        }
+                    },
+                    onAdBlockChanged = {
+                        browserTabs.forEach { tab ->
+                            tab.webView.updateAdBlock(BrowserPreferences.isAdBlockEnabled(this))
                         }
                     },
                     onScaleChanged = { recreate() },

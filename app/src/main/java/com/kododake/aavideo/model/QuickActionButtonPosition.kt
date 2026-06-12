@@ -1,4 +1,4 @@
-package com.kododake.aabrowser.model
+package com.kododake.aavideo.model
 
 enum class QuickActionButtonPosition(
     val storageKey: String

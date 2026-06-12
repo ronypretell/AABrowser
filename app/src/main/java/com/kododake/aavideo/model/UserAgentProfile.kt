@@ -1,6 +1,6 @@
-package com.kododake.aabrowser.model
+package com.kododake.aavideo.model
 
-import com.kododake.aabrowser.R
+import com.kododake.aavideo.R
 
 enum class UserAgentProfile(
     val storageKey: String,

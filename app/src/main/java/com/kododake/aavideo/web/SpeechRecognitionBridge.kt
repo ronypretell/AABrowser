@@ -1,4 +1,4 @@
-package com.kododake.aabrowser.web
+package com.kododake.aavideo.web
 
 import android.content.Intent
 import android.net.Uri

@@ -1,4 +1,4 @@
-package com.kododake.aabrowser.settings
+package com.kododake.aavideo.settings
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -33,17 +33,18 @@ import com.google.android.material.textfield.TextInputLayout
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.common.BitMatrix
 import com.google.zxing.qrcode.QRCodeWriter
-import com.kododake.aabrowser.R
-import com.kododake.aabrowser.data.BrowserPreferences
-import com.kododake.aabrowser.model.AppThemeMode
-import com.kododake.aabrowser.model.QuickActionButtonMode
-import com.kododake.aabrowser.model.QuickActionButtonPosition
-import com.kododake.aabrowser.model.UserAgentProfile
+import com.kododake.aavideo.R
+import com.kododake.aavideo.data.BrowserPreferences
+import com.kododake.aavideo.model.AppThemeMode
+import com.kododake.aavideo.model.QuickActionButtonMode
+import com.kododake.aavideo.model.QuickActionButtonPosition
+import com.kododake.aavideo.model.UserAgentProfile
 
 data class SettingsCallbacks(
     val onClose: () -> Unit = {},
     val onThemeChanged: () -> Unit = {},
     val onPageDarkeningChanged: () -> Unit = {},
+    val onAdBlockChanged: () -> Unit = {},
     val onScaleChanged: () -> Unit = {},
     val onHomePageChanged: () -> Unit = {},
     val onInAppControlsChanged: () -> Unit = {},
@@ -327,6 +328,54 @@ object SettingsViews {
 
         appearanceCard.addView(appearanceInner)
         container.addView(appearanceCard)
+
+        val adBlockCard = createStyledCard()
+        val adBlockInner = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        adBlockInner.addView(
+            createSectionTitle(
+                context.getString(R.string.settings_ad_block),
+                R.drawable.security_24px,
+                bottomPaddingDp = 4
+            )
+        )
+        adBlockInner.addView(TextView(context).apply {
+            text = context.getString(R.string.settings_ad_block_description)
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+            setTextColor(onSurfaceColor)
+            setPadding(0, dp(4), 0, dp(8))
+        })
+        val adBlockRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, 0)
+        }
+        val adBlockText = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(12)
+            }
+        }
+        adBlockText.addView(TextView(context).apply {
+            text = context.getString(R.string.settings_ad_block)
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+            setTextColor(onSurfaceColor)
+        })
+        val adBlockSwitch = SwitchMaterial(context).apply {
+            isChecked = BrowserPreferences.isAdBlockEnabled(context)
+            setUseMaterialThemeColors(true)
+        }
+        adBlockSwitch.setOnCheckedChangeListener { _, isChecked ->
+            BrowserPreferences.setAdBlockEnabled(context, isChecked)
+            callbacks.onAdBlockChanged()
+        }
+        adBlockRow.addView(adBlockText)
+        adBlockRow.addView(adBlockSwitch)
+        adBlockInner.addView(adBlockRow)
+        adBlockCard.addView(adBlockInner)
+        container.addView(adBlockCard)
 
         val displayScaleCard = createStyledCard()
         val displayScaleInner = LinearLayout(context).apply {
@@ -1192,6 +1241,7 @@ object SettingsViews {
             onClose = { (context as? android.app.Activity)?.finish() },
             onThemeChanged = { (context as? android.app.Activity)?.recreate() },
             onPageDarkeningChanged = { (context as? android.app.Activity)?.recreate() },
+            onAdBlockChanged = { (context as? android.app.Activity)?.recreate() },
             onScaleChanged = { (context as? android.app.Activity)?.recreate() },
             onHomePageChanged = { (context as? android.app.Activity)?.recreate() }
         )

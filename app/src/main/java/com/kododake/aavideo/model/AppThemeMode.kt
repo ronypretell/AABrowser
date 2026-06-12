@@ -1,4 +1,4 @@
-package com.kododake.aabrowser.model
+package com.kododake.aavideo.model
 
 import androidx.appcompat.app.AppCompatDelegate
 

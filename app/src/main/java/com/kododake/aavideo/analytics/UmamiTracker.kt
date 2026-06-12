@@ -1,4 +1,4 @@
-package com.kododake.aabrowser.analytics
+package com.kododake.aavideo.analytics
 
 import android.content.Context
 import android.util.Log

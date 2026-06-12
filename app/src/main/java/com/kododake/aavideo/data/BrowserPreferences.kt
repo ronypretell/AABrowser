@@ -1,14 +1,14 @@
-package com.kododake.aabrowser.data
+package com.kododake.aavideo.data
 
 import android.content.Context
 import android.content.res.Configuration
 import android.net.Uri
 import android.util.DisplayMetrics
 import android.util.Patterns
-import com.kododake.aabrowser.model.AppThemeMode
-import com.kododake.aabrowser.model.QuickActionButtonMode
-import com.kododake.aabrowser.model.QuickActionButtonPosition
-import com.kododake.aabrowser.model.UserAgentProfile
+import com.kododake.aavideo.model.AppThemeMode
+import com.kododake.aavideo.model.QuickActionButtonMode
+import com.kododake.aavideo.model.QuickActionButtonPosition
+import com.kododake.aavideo.model.UserAgentProfile
 import kotlin.math.roundToInt
 import org.json.JSONArray
 import org.json.JSONObject
@@ -40,6 +40,7 @@ object BrowserPreferences {
     private const val KEY_START_PAGE_SLOTS = "start_page_slots"
     private const val KEY_START_PAGE_BACKGROUND_URI = "start_page_background_uri"
     private const val KEY_HOME_PAGE_URL = "home_page_url"
+    private const val KEY_AD_BLOCK_ENABLED = "ad_block_enabled"
     private const val DEFAULT_URL = "https://www.google.com"
     private const val SEARCH_TEMPLATE = "https://www.google.com/search?q=%s"
 
@@ -148,6 +149,18 @@ object BrowserPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_BETA_FORCE_DARK_PAGES, enabled)
+            .apply()
+    }
+
+    fun isAdBlockEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_AD_BLOCK_ENABLED, false)
+    }
+
+    fun setAdBlockEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_AD_BLOCK_ENABLED, enabled)
             .apply()
     }
 
@@ -404,7 +417,7 @@ object BrowserPreferences {
 
     fun getStartPageSlots(context: Context): List<String?> {
         val slots = loadStartPageSlots(context)
-        return slots.map { it.ifBlank { null } }
+        return listOf("https://www.youtube.com/tv") + slots.map { it.ifBlank { null } }
     }
 
     fun getStartPageSites(context: Context): List<String> {
