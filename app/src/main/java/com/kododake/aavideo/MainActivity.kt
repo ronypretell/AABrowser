@@ -81,7 +81,12 @@ class MainActivity : AppCompatActivity() {
         val speechBridge: com.kododake.aavideo.web.SpeechRecognitionBridge,
         var currentUrl: String = "",
         var currentTitle: String = "",
-        var isPlaying: Boolean = false
+        var isPlaying: Boolean = false,
+        var mediaTitle: String = "",
+        var mediaArtist: String = "",
+        var mediaPositionMs: Long = 0L,
+        var mediaDurationMs: Long = 0L,
+        var mediaArtworkUrl: String = ""
     )
 
     private lateinit var binding: ActivityMainBinding
@@ -132,31 +137,243 @@ class MainActivity : AppCompatActivity() {
     private var cachedStartPageGradientSignature: Int = 0
 
     private var mediaSession: android.media.session.MediaSession? = null
+    private var mediaTitle: String = ""
+    private var mediaArtist: String = ""
+    private var mediaPositionMs: Long = 0L
+    private var mediaDurationMs: Long = 0L
+    private var mediaArtworkUrl: String = ""
+    private var mediaIsPlaying: Boolean = false
+
+    private var currentArtworkUrl: String = ""
+    private var currentArtworkBitmap: android.graphics.Bitmap? = null
+
+    private var ytTvCloseButton: android.widget.ImageButton? = null
 
     private fun updateMediaSessionState(isPlaying: Boolean) {
-        val stateBuilder = android.media.session.PlaybackState.Builder()
-        if (isPlaying) {
-            stateBuilder.setState(
-                android.media.session.PlaybackState.STATE_PLAYING,
-                android.media.session.PlaybackState.PLAYBACK_POSITION_UNKNOWN,
-                1.0f
-            )
-        } else {
-            stateBuilder.setState(
-                android.media.session.PlaybackState.STATE_PAUSED,
-                android.media.session.PlaybackState.PLAYBACK_POSITION_UNKNOWN,
-                0.0f
-            )
+        mediaIsPlaying = isPlaying
+        updateMediaSession()
+    }
+
+    private val genericTitles = setOf(
+        "youtube en tv", "youtube on tv", "youtube", "inicio", "home",
+        "buscar", "search", "aabrowser", "navegador"
+    )
+
+    private fun isGenericTitle(title: String): Boolean {
+        val lower = title.lowercase().trim()
+        if (lower.isBlank()) return true
+        if (lower in genericTitles) return true
+        if (lower.contains("youtube") && (lower.contains("tv") || lower.contains("television") || lower.contains("televisión") || lower.contains("en tv") || lower.contains("on tv"))) return true
+        if (lower == "youtube" || lower == "navegador" || lower == "aabrowser") return true
+        return false
+    }
+
+    private fun updateMediaSessionMetadata(
+        title: String,
+        artist: String,
+        artworkUrl: String,
+        positionMs: Long,
+        durationMs: Long,
+        isPlaying: Boolean
+    ) {
+        // Only update title/artist if they are meaningful (not generic page titles)
+        if (!isGenericTitle(title)) {
+            mediaTitle = title
         }
+        if (artist.isNotBlank() && artist.lowercase().trim() != "www.youtube.com" && artist.lowercase().trim() != "youtube.com") {
+            mediaArtist = artist
+        }
+        mediaArtworkUrl = artworkUrl
+        mediaPositionMs = positionMs
+        mediaDurationMs = durationMs
+        mediaIsPlaying = isPlaying
+        
+        loadArtworkAndMetadataAsync(artworkUrl)
+        updateMediaSession()
+    }
+
+    private fun extractYouTubeVideoId(url: String): String? {
+        // Match YouTube thumbnail URLs like https://img.youtube.com/vi/VIDEO_ID/hqdefault.jpg
+        val regex = Regex("""img\.youtube\.com/vi/([^/]+)/""")
+        return regex.find(url)?.groupValues?.getOrNull(1)
+    }
+
+    private fun extractYouTubeVideoIdFromUrl(url: String): String? {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+        val host = uri.host?.lowercase() ?: return null
+        if (!host.contains("youtube.com") && !host.contains("youtu.be")) return null
+        
+        // Check standard query param ?v=...
+        uri.getQueryParameter("v")?.let { return it }
+        
+        // Check path parameter for embed/v/shorts/...
+        val pathSegments = uri.pathSegments
+        if (pathSegments.contains("embed") || pathSegments.contains("v") || pathSegments.contains("shorts") || pathSegments.contains("watch")) {
+            val idx = pathSegments.indexOfFirst { it == "embed" || it == "v" || it == "shorts" || it == "watch" }
+            if (idx != -1 && idx + 1 < pathSegments.size) {
+                val candidate = pathSegments[idx + 1]
+                if (candidate.length == 11) return candidate
+            }
+        }
+        
+        // Check hash parameter if it's youtube.com/tv#/watch?v=VIDEO_ID
+        val fragment = uri.fragment
+        if (!fragment.isNullOrBlank()) {
+            val fragUri = runCatching { Uri.parse("https://dummy.com/$fragment") }.getOrNull()
+            fragUri?.getQueryParameter("v")?.let { return it }
+        }
+        
+        return null
+    }
+
+    private fun fetchOEmbedMetadata(client: okhttp3.OkHttpClient, videoId: String) {
+        try {
+            val oEmbedUrl = "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=$videoId&format=json"
+            val oEmbedRequest = okhttp3.Request.Builder().url(oEmbedUrl).build()
+            client.newCall(oEmbedRequest).execute().use { oEmbedResponse ->
+                if (oEmbedResponse.isSuccessful) {
+                    val jsonStr = oEmbedResponse.body.string()
+                    val json = org.json.JSONObject(jsonStr)
+                    val oEmbedTitle = json.optString("title", "")
+                    val oEmbedAuthor = json.optString("author_name", "")
+                    runOnUiThread {
+                        if (oEmbedTitle.isNotBlank() && !isGenericTitle(oEmbedTitle)) {
+                            mediaTitle = oEmbedTitle
+                        }
+                        if (oEmbedAuthor.isNotBlank() && isGenericTitle(mediaTitle).not()) {
+                            mediaArtist = oEmbedAuthor
+                        }
+                        updateMediaSession()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    private fun fetchMetadataFromUrlAsync(url: String) {
+        val videoId = extractYouTubeVideoIdFromUrl(url) ?: return
+        Thread {
+            try {
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                fetchOEmbedMetadata(client, videoId)
+            } catch (e: Exception) {
+                // ignore
+            }
+        }.start()
+    }
+
+    private fun loadArtworkAndMetadataAsync(url: String) {
+        val trimmedUrl = url.trim()
+        if (trimmedUrl.isBlank()) {
+            currentArtworkBitmap = null
+            currentArtworkUrl = ""
+            if (isGenericTitle(mediaTitle)) {
+                fetchMetadataFromUrlAsync(currentUrl)
+            } else {
+                updateMediaSession()
+            }
+            return
+        }
+        if (trimmedUrl == currentArtworkUrl && !isGenericTitle(mediaTitle)) return
+        currentArtworkUrl = trimmedUrl
+        
+        Thread {
+            try {
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+
+                // Load artwork bitmap
+                val request = okhttp3.Request.Builder().url(trimmedUrl).build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val bytes = response.body.bytes()
+                        val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        runOnUiThread {
+                            if (currentArtworkUrl == trimmedUrl) {
+                                currentArtworkBitmap = bitmap
+                                updateMediaSession()
+                            }
+                        }
+                    }
+                }
+
+                // If title is still generic, try to fetch from YouTube oEmbed API
+                if (isGenericTitle(mediaTitle)) {
+                    var videoId = extractYouTubeVideoId(trimmedUrl)
+                    if (videoId == null) {
+                        videoId = extractYouTubeVideoIdFromUrl(currentUrl)
+                    }
+                    if (videoId != null) {
+                        fetchOEmbedMetadata(client, videoId)
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    if (currentArtworkUrl == trimmedUrl) {
+                        currentArtworkBitmap = null
+                        updateMediaSession()
+                    }
+                }
+            }
+        }.start()
+    }
+
+    private fun updateMediaSession() {
+        val session = mediaSession ?: return
+        
+        val stateBuilder = android.media.session.PlaybackState.Builder()
+        val state = if (mediaIsPlaying) {
+            android.media.session.PlaybackState.STATE_PLAYING
+        } else {
+            android.media.session.PlaybackState.STATE_PAUSED
+        }
+        val speed = if (mediaIsPlaying) 1.0f else 0.0f
+        
+        stateBuilder.setState(
+            state,
+            mediaPositionMs,
+            speed,
+            android.os.SystemClock.elapsedRealtime()
+        )
+        
         stateBuilder.setActions(
             android.media.session.PlaybackState.ACTION_PLAY or
             android.media.session.PlaybackState.ACTION_PAUSE or
             android.media.session.PlaybackState.ACTION_PLAY_PAUSE or
             android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT or
-            android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS
+            android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+            android.media.session.PlaybackState.ACTION_SEEK_TO
         )
-        mediaSession?.setPlaybackState(stateBuilder.build())
-        showMediaNotification(isPlaying)
+        session.setPlaybackState(stateBuilder.build())
+
+        val metadataBuilder = android.media.MediaMetadata.Builder()
+        val fallbackTitle = if (!isGenericTitle(currentPageTitle)) currentPageTitle else "Reproduciendo..."
+        val titleText = if (!isGenericTitle(mediaTitle)) mediaTitle else fallbackTitle
+        val artistText = if (mediaArtist.isNotBlank() && !isGenericTitle(mediaArtist)) mediaArtist else {
+            if (currentUrl.isNotBlank()) currentUrl else "Navegador"
+        }
+        
+        metadataBuilder.putString(android.media.MediaMetadata.METADATA_KEY_TITLE, titleText)
+        metadataBuilder.putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, artistText)
+        if (mediaDurationMs > 0) {
+            metadataBuilder.putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, mediaDurationMs)
+        }
+        
+        val art = currentArtworkBitmap
+        if (art != null) {
+            metadataBuilder.putBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART, art)
+            metadataBuilder.putBitmap(android.media.MediaMetadata.METADATA_KEY_ART, art)
+        }
+        session.setMetadata(metadataBuilder.build())
+
+        showMediaNotification(mediaIsPlaying)
     }
 
     private fun setupMediaSession() {
@@ -182,6 +399,18 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                     updateMediaSessionState(false)
+                }
+
+                override fun onSeekTo(pos: Long) {
+                    super.onSeekTo(pos)
+                    runOnUiThread {
+                        webView?.evaluateJavascript(
+                            "(function(){ var v=document.querySelector('video,audio'); if(v) v.currentTime = ${pos / 1000.0}; })()",
+                            null
+                        )
+                        mediaPositionMs = pos
+                        updateMediaSession()
+                    }
                 }
 
                 override fun onSkipToNext() {
@@ -332,17 +561,20 @@ class MainActivity : AppCompatActivity() {
         }
         val playPauseTitle = if (isPlaying) "Pausar" else "Reproducir"
 
-        val titleText = currentPageTitle.ifBlank { "AABrowser" }
-        val urlText = currentUrl.ifBlank { "Navegador" }
+        val fallbackTitle = if (!isGenericTitle(currentPageTitle)) currentPageTitle else "Reproduciendo..."
+        val titleText = if (!isGenericTitle(mediaTitle)) mediaTitle else fallbackTitle
+        val artistText = if (mediaArtist.isNotBlank() && !isGenericTitle(mediaArtist)) mediaArtist else {
+            if (currentUrl.isNotBlank()) currentUrl else "Navegador"
+        }
 
-        val notification = android.app.Notification.Builder(this, CHANNEL_ID)
+        val notificationBuilder = android.app.Notification.Builder(this, CHANNEL_ID)
             .setStyle(android.app.Notification.MediaStyle()
                 .setMediaSession(sessionToken)
                 .setShowActionsInCompactView(0, 1, 2)
             )
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(titleText)
-            .setContentText(urlText)
+            .setContentText(artistText)
             .setOngoing(isPlaying)
             .setVisibility(android.app.Notification.VISIBILITY_PUBLIC)
             .addAction(android.app.Notification.Action.Builder(
@@ -354,8 +586,13 @@ class MainActivity : AppCompatActivity() {
             .addAction(android.app.Notification.Action.Builder(
                 android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_media_next), "Siguiente", nextIntent
             ).build())
-            .build()
 
+        val art = currentArtworkBitmap
+        if (art != null) {
+            notificationBuilder.setLargeIcon(art)
+        }
+
+        val notification = notificationBuilder.build()
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
@@ -972,6 +1209,31 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+
+            @android.webkit.JavascriptInterface
+            fun onMediaMetadataChanged(
+                title: String,
+                artist: String,
+                artworkUrl: String,
+                positionMs: String,
+                durationMs: String,
+                isPlaying: Boolean
+            ) {
+                val posMs = positionMs.toLongOrNull() ?: 0L
+                val durMs = durationMs.toLongOrNull() ?: 0L
+                android.util.Log.d("AABrowser", "MediaMetadata: title='$title', artist='$artist', artwork='${artworkUrl.take(60)}', pos=$posMs, dur=$durMs")
+                runOnUiThread {
+                    tab.mediaTitle = title
+                    tab.mediaArtist = artist
+                    tab.mediaArtworkUrl = artworkUrl
+                    tab.mediaPositionMs = posMs
+                    tab.mediaDurationMs = durMs
+                    tab.isPlaying = isPlaying
+                    if (tab.id == activeTabId) {
+                        updateMediaSessionMetadata(title, artist, artworkUrl, posMs, durMs, isPlaying)
+                    }
+                }
+            }
         }, "AndroidMediaBridge")
 
         tabView.setOnTouchListener { _, _ ->
@@ -1115,7 +1377,14 @@ class MainActivity : AppCompatActivity() {
         activeTabId = selectedTab.id
         webView = selectedTab.webView
 
-        updateMediaSessionState(selectedTab.isPlaying)
+        updateMediaSessionMetadata(
+            title = selectedTab.mediaTitle,
+            artist = selectedTab.mediaArtist,
+            artworkUrl = selectedTab.mediaArtworkUrl,
+            positionMs = selectedTab.mediaPositionMs,
+            durationMs = selectedTab.mediaDurationMs,
+            isPlaying = selectedTab.isPlaying
+        )
 
         browserTabs.forEach { tab ->
             tab.webView.visibility = if (tab.id == selectedTab.id) View.VISIBLE else View.GONE
@@ -1753,6 +2022,31 @@ class MainActivity : AppCompatActivity() {
                 binding.settingsViewRoot.isVisible -> hideSettingsView()
                 binding.menuOverlay.isVisible -> hideMenuOverlay()
                 isShowingStartPage && currentUrl.isNotBlank() -> hideStartPage()
+                isYouTubeTvUrl(currentUrl) && currentUrl.contains("watch") -> {
+                    webView?.evaluateJavascript(
+                        """
+                        (function() {
+                            function sendKey(code, keyCode) {
+                                var target = document.activeElement || document.body || document;
+                                var init = {
+                                    key: code,
+                                    code: code,
+                                    keyCode: keyCode,
+                                    which: keyCode,
+                                    bubbles: true,
+                                    cancelable: true,
+                                    view: window
+                                };
+                                target.dispatchEvent(new KeyboardEvent('keydown', init));
+                                target.dispatchEvent(new KeyboardEvent('keyup', init));
+                            }
+                            sendKey('Backspace', 8);
+                            sendKey('Escape', 27);
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
+                }
                 webView?.canGoBack() == true -> webView?.goBack()
                 else -> {
                     isEnabled = false
@@ -1856,6 +2150,7 @@ class MainActivity : AppCompatActivity() {
         binding.buttonExternal.isEnabled = canInteractWithPage
         binding.desktopSwitch.isEnabled = !isShowingStartPage
         binding.desktopSwitch.alpha = if (binding.desktopSwitch.isEnabled) 1f else 0.6f
+        checkCloseButtonVisibilityOnNavigation()
     }
 
     private fun updateConnectionSecurityIcon(url: String?) {
@@ -1922,9 +2217,85 @@ class MainActivity : AppCompatActivity() {
         binding.menuOverlayScrim.animate().alpha(0f).setDuration(200).start()
     }
 
+    private fun showYtTvCloseButtonTemporarily() {
+        if (!isYouTubeTvUrl(currentUrl) || !currentUrl.contains("watch")) {
+            ytTvCloseButton?.visibility = View.GONE
+            return
+        }
+        
+        if (ytTvCloseButton == null) {
+            val button = android.widget.ImageButton(this).apply {
+                setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+                setColorFilter(Color.WHITE)
+                val drawable = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(Color.parseColor("#80000000")) // 50% transparent black
+                }
+                background = drawable
+                elevation = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6f, resources.displayMetrics)
+                
+                setOnClickListener {
+                    webView?.evaluateJavascript(
+                        """
+                        (function() {
+                            function sendKey(code, keyCode) {
+                                var target = document.activeElement || document.body || document;
+                                var init = {
+                                    key: code,
+                                    code: code,
+                                    keyCode: keyCode,
+                                    which: keyCode,
+                                    bubbles: true,
+                                    cancelable: true,
+                                    view: window
+                                };
+                                target.dispatchEvent(new KeyboardEvent('keydown', init));
+                                target.dispatchEvent(new KeyboardEvent('keyup', init));
+                            }
+                            sendKey('Backspace', 8);
+                            sendKey('Escape', 27);
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
+                    visibility = View.GONE
+                }
+            }
+            
+            val size = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 48f, resources.displayMetrics).toInt()
+            val params = FrameLayout.LayoutParams(size, size).apply {
+                gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                leftMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics).toInt()
+                topMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics).toInt()
+            }
+            
+            (binding.root as? ViewGroup)?.addView(button, params)
+            ytTvCloseButton = button
+        }
+        
+        ytTvCloseButton?.apply {
+            animate().cancel()
+            visibility = View.VISIBLE
+            alpha = 1.0f
+            animate()
+                .alpha(0f)
+                .setStartDelay(5000)
+                .setDuration(500)
+                .withEndAction { visibility = View.GONE }
+                .start()
+        }
+    }
+
+    private fun checkCloseButtonVisibilityOnNavigation() {
+        if (!isYouTubeTvUrl(currentUrl) || !currentUrl.contains("watch")) {
+            ytTvCloseButton?.visibility = View.GONE
+        }
+    }
+
     private fun showMenuButtonTemporarily() {
         handler.removeCallbacks(showMenuFabRunnable)
         handler.removeCallbacks(autoHideMenuFab)
+        showYtTvCloseButtonTemporarily()
         if (isInFullscreen() || binding.menuOverlay.isVisible) return
         if (isShowingStartPage || BrowserPreferences.isQuickActionButtonAlwaysVisible(this)) {
             binding.menuFab.show()

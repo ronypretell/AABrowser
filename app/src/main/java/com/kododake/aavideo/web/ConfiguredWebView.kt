@@ -356,6 +356,12 @@ const val YOUTUBE_TV_TOUCH_NAVIGATION_JS = """
     if (window.hasYouTubeTvTouchNav) return;
     window.hasYouTubeTvTouchNav = true;
     
+    try {
+        var style = document.createElement('style');
+        style.innerHTML = '* { touch-action: manipulation !important; }';
+        document.head.appendChild(style);
+    } catch (e) {}
+    
     let startX = 0;
     let startY = 0;
     let isMoving = false;
@@ -409,7 +415,7 @@ const val YOUTUBE_TV_TOUCH_NAVIGATION_JS = """
         if (keyToSend) {
             sendKey(keyToSend);
         }
-    }, { passive: true });
+    }, { passive: false });
 
     function sendKey(code) {
         const target = document.activeElement || document.body || document;
@@ -420,6 +426,8 @@ const val YOUTUBE_TV_TOUCH_NAVIGATION_JS = """
         else if (code === 'ArrowRight') keyCode = 39;
         else if (code === 'ArrowDown') keyCode = 40;
         else if (code === 'Enter') keyCode = 13;
+        else if (code === 'Escape') keyCode = 27;
+        else if (code === 'Backspace') keyCode = 8;
 
         const createEvent = (type) => new KeyboardEvent(type, {
             key: code,
@@ -449,6 +457,8 @@ fun WebView.applyYouTubeTvUserAgent() {
     settings.userAgentString = YOUTUBE_TV_USER_AGENT
     settings.useWideViewPort = true
     settings.loadWithOverviewMode = true
+    settings.setSupportZoom(false)
+    settings.builtInZoomControls = false
     setInitialScale(0)
 }
 
@@ -456,6 +466,8 @@ fun WebView.restoreDefaultUserAgent() {
     val profile = com.kododake.aavideo.data.BrowserPreferences.getUserAgentProfile(context)
     val desktop = com.kododake.aavideo.data.BrowserPreferences.shouldUseDesktopMode(context)
     applyUserAgent(profile, desktop)
+    settings.setSupportZoom(true)
+    settings.builtInZoomControls = true
     val scale = context.resources.displayMetrics.density * 100
     setInitialScale(scale.toInt())
 }
@@ -526,17 +538,319 @@ const val MEDIA_LISTENER_JS = """
     if (window.hasAndroidMediaListeners) return;
     window.hasAndroidMediaListeners = true;
     
+    var lastVideoId = null;
+    
     function reportState() {
-        var isPlaying = false;
         var mediaElements = document.querySelectorAll('video, audio');
+        var activeElement = null;
+        var isPlaying = false;
+        
         for (var i = 0; i < mediaElements.length; i++) {
-            if (!mediaElements[i].paused && !mediaElements[i].ended && mediaElements[i].readyState > 2) {
+            var el = mediaElements[i];
+            if (!el.paused && !el.ended && el.readyState > 0) {
                 isPlaying = true;
+                activeElement = el;
                 break;
             }
         }
+        
+        if (!activeElement && mediaElements.length > 0) {
+            activeElement = mediaElements[0];
+        }
+        
+        var videoId = "";
+        try {
+            var player = document.getElementById("movie_player") || document.querySelector(".html5-video-player");
+            if (player && typeof player.getVideoData === 'function') {
+                var data = player.getVideoData();
+                if (data && data.video_id) {
+                    videoId = data.video_id;
+                }
+            }
+        } catch (e) {}
+        if (!videoId) {
+            try {
+                var match = window.location.href.match(/[?&]v=([^&#]+)/);
+                if (match) videoId = match[1];
+            } catch (e) {}
+        }
+        
+        if (videoId && videoId !== lastVideoId) {
+            lastVideoId = videoId;
+            try {
+                var captionWindow = document.querySelector('.ytp-caption-window-container, .caption-window');
+                if (captionWindow && captionWindow.children.length > 0) {
+                    var ccBtn = document.querySelector('.ytp-subtitles-button');
+                    if (ccBtn) {
+                        ccBtn.click();
+                    } else {
+                        var target = document.activeElement || document.body || document;
+                        var init = { key: 'c', code: 'KeyC', keyCode: 67, which: 67, bubbles: true, cancelable: true, view: window };
+                        target.dispatchEvent(new KeyboardEvent('keydown', init));
+                        target.dispatchEvent(new KeyboardEvent('keyup', init));
+                    }
+                }
+            } catch (e) {}
+            try {
+                var videos = document.querySelectorAll('video');
+                for (var i = 0; i < videos.length; i++) {
+                    var v = videos[i];
+                    if (v.textTracks) {
+                        for (var j = 0; j < v.textTracks.length; j++) {
+                            v.textTracks[j].mode = 'disabled';
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+        
+        var title = "";
+        var artist = "";
+        var artworkUrl = "";
+        var positionMs = 0;
+        var durationMs = 0;
+        
+        if (activeElement) {
+            try {
+                if (activeElement.volume < 1.0) {
+                    activeElement.volume = 1.0;
+                }
+                if (activeElement.muted) {
+                    activeElement.muted = false;
+                }
+            } catch (e) {}
+            
+            positionMs = Math.floor(activeElement.currentTime * 1000);
+            var dur = activeElement.duration;
+            if (!isNaN(dur) && isFinite(dur)) {
+                durationMs = Math.floor(dur * 1000);
+            }
+        }
+        
+        function isValidTitle(t) {
+            if (!t) return false;
+            var clean = t.toLowerCase().trim();
+            if (clean === "" || 
+                clean === "youtube" || 
+                clean === "inicio" || 
+                clean === "home" || 
+                clean === "buscar" || 
+                clean === "search") {
+                return false;
+            }
+            if (clean.indexOf("youtube") !== -1 && (clean.indexOf("tv") !== -1 || clean.indexOf("television") !== -1 || clean.indexOf("televisión") !== -1)) {
+                return false;
+            }
+            return true;
+        }
+        
+        // 1. Try MediaSession API first (most standard and updated by web page developers)
+        if (navigator.mediaSession && navigator.mediaSession.metadata) {
+            var msTitle = navigator.mediaSession.metadata.title;
+            if (isValidTitle(msTitle)) {
+                title = msTitle;
+            }
+            var msArtist = navigator.mediaSession.metadata.artist;
+            if (msArtist) {
+                artist = msArtist;
+            }
+            if (navigator.mediaSession.metadata.artwork && navigator.mediaSession.metadata.artwork.length > 0) {
+                var artwork = navigator.mediaSession.metadata.artwork;
+                artworkUrl = artwork[artwork.length - 1].src || "";
+            }
+        }
+        
+        // 2. Try YouTube Player API next (covers YouTube, YouTube TV, and YouTube embeds)
+        if ((!title || !artworkUrl) && (window.location.hostname.includes("youtube.com") || window.location.hostname.includes("youtu.be"))) {
+            // 2a. Try getVideoData from movie_player
+            try {
+                var players = document.querySelectorAll('#movie_player, .html5-video-player');
+                for (var pi = 0; pi < players.length; pi++) {
+                    var player = players[pi];
+                    if (player && typeof player.getVideoData === 'function') {
+                        var data = player.getVideoData();
+                        if (data) {
+                            if (!title && isValidTitle(data.title)) {
+                                title = data.title;
+                            }
+                            if (!artist && data.author) {
+                                artist = data.author;
+                            }
+                            if (!artworkUrl && data.video_id) {
+                                artworkUrl = "https://img.youtube.com/vi/" + data.video_id + "/hqdefault.jpg";
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
+            
+            // 2b. Try ytInitialPlayerResponse global (set by YouTube on page load)
+            if (!title) {
+                try {
+                    if (window.ytInitialPlayerResponse && window.ytInitialPlayerResponse.videoDetails) {
+                        var vd = window.ytInitialPlayerResponse.videoDetails;
+                        if (isValidTitle(vd.title)) {
+                            title = vd.title;
+                        }
+                        if (!artist && vd.author) {
+                            artist = vd.author;
+                        }
+                        if (!artworkUrl && vd.videoId) {
+                            artworkUrl = "https://img.youtube.com/vi/" + vd.videoId + "/hqdefault.jpg";
+                        }
+                    }
+                } catch (e) {}
+            }
+            
+            // 2c. Try ytPlayerConfig or ytcfg globals
+            if (!title) {
+                try {
+                    var cfg = window.ytPlayerConfig || window.ytcfg;
+                    if (cfg) {
+                        var args = cfg.args || (typeof cfg.get === 'function' ? cfg.get('PLAYER_VARS') : null);
+                        if (args && isValidTitle(args.title)) {
+                            title = args.title;
+                        }
+                    }
+                } catch (e) {}
+            }
+            
+            // 2d. Try .ytp-title-text inside player (YouTube standard & TV)
+            if (!title) {
+                try {
+                    var ytpTitle = document.querySelector('.ytp-title-text .ytp-title-link, .ytp-title-text');
+                    if (ytpTitle && isValidTitle(ytpTitle.innerText)) {
+                        title = ytpTitle.innerText.trim();
+                    }
+                } catch (e) {}
+            }
+            
+            // 2e. Ensure video_id is extracted for artwork even if title fails
+            if (!artworkUrl) {
+                try {
+                    var vid = "";
+                    var vMatch = window.location.href.match(/[?&]v=([^&#]+)/);
+                    if (vMatch) vid = vMatch[1];
+                    if (!vid) {
+                        var pathMatch = window.location.pathname.match(/\/(?:watch|embed|shorts|v)\/([^/?&#]+)/);
+                        if (pathMatch) vid = pathMatch[1];
+                    }
+                    if (vid) {
+                        artworkUrl = "https://img.youtube.com/vi/" + vid + "/hqdefault.jpg";
+                    }
+                } catch (e) {}
+            }
+        }
+        
+        // 3. Try YouTube specific selectors if still empty
+        if ((!title || !artworkUrl) && window.location.hostname.includes("youtube.com")) {
+            if (!title) {
+                var selectors = [
+                    '.video-title',
+                    '.metadata-title',
+                    '.metadata-title-text',
+                    '.player-metadata-title',
+                    '.player-metadata-title-text',
+                    '.info-title',
+                    '.ytp-title-link',
+                    '.slim-video-metadata-title',
+                    '.ytm-slim-video-metadata-title',
+                    'h1.ytd-watch-metadata'
+                ];
+                for (var i = 0; i < selectors.length; i++) {
+                    var el = document.querySelector(selectors[i]);
+                    if (el && el.innerText && isValidTitle(el.innerText)) {
+                        title = el.innerText.trim();
+                        break;
+                    }
+                }
+            }
+            if (!artist) {
+                var ytChannelEl = document.querySelector('#owner-sub-count, #upload-info #owner-name, .ytp-title-expanded-title, .slim-owner-profile-name');
+                if (ytChannelEl) artist = ytChannelEl.innerText;
+            }
+            if (!artworkUrl) {
+                var videoId = "";
+                var match = window.location.search.match(/[?&]v=([^&#]+)/);
+                if (match) {
+                    videoId = match[1];
+                } else {
+                    var pathParts = window.location.pathname.split('/');
+                    if (pathParts.includes("embed")) {
+                        videoId = pathParts[pathParts.indexOf("embed") + 1];
+                    }
+                }
+                if (videoId) {
+                    artworkUrl = "https://img.youtube.com/vi/" + videoId + "/hqdefault.jpg";
+                }
+            }
+        }
+        
+        // 4. Scan DOM for title/metadata classes as fallback for TV and other platforms
+        if (!title) {
+            try {
+                var elList = document.querySelectorAll('div, span, h1, h2, h3, a, p');
+                for (var i = 0; i < elList.length; i++) {
+                    var el = elList[i];
+                    var className = el.className;
+                    if (typeof className === 'string' && (className.indexOf('title') !== -1 || className.indexOf('metadata') !== -1)) {
+                        var text = el.innerText || el.textContent;
+                        if (text) {
+                            var trimmed = text.trim();
+                            if (trimmed.length > 3 && trimmed.length < 120 && trimmed.indexOf('\n') === -1 && isValidTitle(trimmed)) {
+                                title = trimmed;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+        
+        // 5. Generic site meta-tags for artwork
+        if (!artworkUrl) {
+            var ogImg = document.querySelector('meta[property="og:image"]');
+            if (ogImg) {
+                artworkUrl = ogImg.content || ogImg.getAttribute('content') || "";
+            }
+        }
+        if (!artworkUrl) {
+            var twitterImg = document.querySelector('meta[name="twitter:image"]');
+            if (twitterImg) {
+                artworkUrl = twitterImg.content || twitterImg.getAttribute('content') || "";
+            }
+        }
+        
+        // 6. Last resort document fallbacks
+        if (!title) {
+            var docTitle = document.title;
+            if (docTitle && docTitle.endsWith(" - YouTube")) {
+                docTitle = docTitle.substring(0, docTitle.length - 10);
+            }
+            if (isValidTitle(docTitle)) {
+                title = docTitle;
+            }
+        }
+        if (!artist) {
+            artist = window.location.hostname;
+        }
+        
+        title = (title || "").trim();
+        artist = (artist || "").trim();
+        artworkUrl = (artworkUrl || "").trim();
+        
         if (window.AndroidMediaBridge) {
             window.AndroidMediaBridge.onPlaybackStateChanged(isPlaying);
+            if (typeof window.AndroidMediaBridge.onMediaMetadataChanged === 'function') {
+                window.AndroidMediaBridge.onMediaMetadataChanged(
+                    title,
+                    artist,
+                    artworkUrl,
+                    String(positionMs),
+                    String(durationMs),
+                    isPlaying
+                );
+            }
         }
     }
 
@@ -548,6 +862,7 @@ const val MEDIA_LISTENER_JS = """
         element.addEventListener('pause', reportState);
         element.addEventListener('ended', reportState);
         element.addEventListener('volumechange', reportState);
+        element.addEventListener('seeked', reportState);
     }
 
     var elements = document.querySelectorAll('video, audio');
