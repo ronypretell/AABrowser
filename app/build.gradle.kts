@@ -119,6 +119,11 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.google.oss.licenses)
     implementation("com.github.woheller69:FreeDroidWarn:V1.+")
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
+    implementation("androidx.media3:media3-exoplayer-dash:1.5.1")
+    implementation("androidx.media3:media3-exoplayer-rtsp:1.5.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -64,6 +64,9 @@ import com.kododake.aavideo.web.isYouTubeTvUrl
 import com.kododake.aavideo.web.applyYouTubeTvUserAgent
 import com.kododake.aavideo.web.restoreDefaultUserAgent
 import com.kododake.aavideo.web.YOUTUBE_TV_USER_AGENT
+import com.kododake.aavideo.web.isPlutoTvUrl
+import com.kododake.aavideo.web.applyPlutoTvConfig
+import com.kododake.aavideo.web.PLUTO_TV_USER_AGENT
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.textview.MaterialTextView
@@ -156,7 +159,8 @@ class MainActivity : AppCompatActivity() {
 
     private val genericTitles = setOf(
         "youtube en tv", "youtube on tv", "youtube", "inicio", "home",
-        "buscar", "search", "aabrowser", "navegador"
+        "buscar", "search", "aabrowser", "navegador",
+        "player", "video", "embed", "iframe", "reproductor", "stream", "loading", "play", "playing", "media"
     )
 
     private fun isGenericTitle(title: String): Boolean {
@@ -165,6 +169,8 @@ class MainActivity : AppCompatActivity() {
         if (lower in genericTitles) return true
         if (lower.contains("youtube") && (lower.contains("tv") || lower.contains("television") || lower.contains("televisión") || lower.contains("en tv") || lower.contains("on tv"))) return true
         if (lower == "youtube" || lower == "navegador" || lower == "aabrowser") return true
+        if (lower.startsWith("embed") || lower.startsWith("player") || lower.startsWith("reproductor")) return true
+        if (lower.endsWith("embed") || lower.endsWith("player") || lower.endsWith("reproductor")) return true
         return false
     }
 
@@ -356,8 +362,19 @@ class MainActivity : AppCompatActivity() {
         val metadataBuilder = android.media.MediaMetadata.Builder()
         val fallbackTitle = if (!isGenericTitle(currentPageTitle)) currentPageTitle else "Reproduciendo..."
         val titleText = if (!isGenericTitle(mediaTitle)) mediaTitle else fallbackTitle
-        val artistText = if (mediaArtist.isNotBlank() && !isGenericTitle(mediaArtist)) mediaArtist else {
-            if (currentUrl.isNotBlank()) currentUrl else "Navegador"
+        val artistText = if (mediaArtist.isNotBlank() && !isGenericTitle(mediaArtist) && !mediaArtist.contains("embed") && !mediaArtist.contains("player") && !mediaArtist.contains("iframe")) {
+            mediaArtist
+        } else {
+            if (currentUrl.isNotBlank()) {
+                val host = runCatching { Uri.parse(currentUrl).host }.getOrNull()
+                if (!host.isNullOrBlank()) {
+                    host.replace("www.", "")
+                } else {
+                    currentUrl
+                }
+            } else {
+                "Navegador"
+            }
         }
         
         metadataBuilder.putString(android.media.MediaMetadata.METADATA_KEY_TITLE, titleText)
@@ -383,7 +400,17 @@ class MainActivity : AppCompatActivity() {
                     super.onPlay()
                     runOnUiThread {
                         webView?.evaluateJavascript(
-                            "(function(){ var v=document.querySelector('video,audio'); if(v) v.play(); })()",
+                            """
+                            (function(){
+                                var p = document.querySelector('.html5-video-player') || document.getElementById('movie_player');
+                                if (p && typeof p.playVideo === 'function') {
+                                    p.playVideo();
+                                } else {
+                                    var v = document.querySelector('video,audio');
+                                    if (v) v.play();
+                                }
+                            })()
+                            """.trimIndent(),
                             null
                         )
                     }
@@ -394,7 +421,17 @@ class MainActivity : AppCompatActivity() {
                     super.onPause()
                     runOnUiThread {
                         webView?.evaluateJavascript(
-                            "(function(){ var v=document.querySelector('video,audio'); if(v) v.pause(); })()",
+                            """
+                            (function(){
+                                var p = document.querySelector('.html5-video-player') || document.getElementById('movie_player');
+                                if (p && typeof p.pauseVideo === 'function') {
+                                    p.pauseVideo();
+                                } else {
+                                    var v = document.querySelector('video,audio');
+                                    if (v) v.pause();
+                                }
+                            })()
+                            """.trimIndent(),
                             null
                         )
                     }
@@ -625,6 +662,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.kododake.aavideo.net.LocalDnsProxy.start()
         DynamicColors.applyToActivityIfAvailable(this)
         AppCompatDelegate.setDefaultNightMode(BrowserPreferences.getThemeMode(this).nightMode)
         super.onCreate(savedInstanceState)
@@ -678,6 +716,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        com.kododake.aavideo.net.LocalDnsProxy.stop()
         mediaSession?.release()
         mediaSession = null
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
@@ -1103,8 +1142,10 @@ class MainActivity : AppCompatActivity() {
             private fun handleUserAgentForUrl(url: String?) {
                 if (isYouTubeTvUrl(url)) {
                     applyYouTubeTvUserAgent()
+                } else if (isPlutoTvUrl(url)) {
+                    applyPlutoTvConfig()
                 } else {
-                    if (settings.userAgentString == YOUTUBE_TV_USER_AGENT) {
+                    if (settings.userAgentString == YOUTUBE_TV_USER_AGENT || settings.userAgentString == PLUTO_TV_USER_AGENT) {
                         restoreDefaultUserAgent()
                     }
                 }
@@ -1724,6 +1765,10 @@ class MainActivity : AppCompatActivity() {
             hideMenuOverlay()
         }
         binding.buttonSettings.setOnClickListener { showSettingsView() }
+        binding.buttonIptvCard.setOnClickListener {
+            hideMenuOverlay()
+            startActivity(Intent(this, IptvActivity::class.java))
+        }
         binding.buttonStartPageResume.setOnClickListener {
             val resumeUrl = BrowserPreferences.getLastVisitedUrl(this)
             if (resumeUrl.isNullOrBlank()) {
@@ -2432,13 +2477,13 @@ class MainActivity : AppCompatActivity() {
         var selectedSlot = when {
             existingSlot >= 0 -> existingSlot
             else -> {
-                val userIndex = slots.subList(1, slots.size).indexOfFirst { it.isNullOrBlank() }
+                val userIndex = slots.subList(2, slots.size).indexOfFirst { it.isNullOrBlank() }
                 if (userIndex >= 0) userIndex else 0
             }
         }
         val slotLabels = Array(BrowserPreferences.MAX_START_PAGE_SITES) { index ->
-            val slotLabel = getString(R.string.start_page_slot_number, index + 2)
-            val slotUrl = slots.getOrNull(index + 1)
+            val slotLabel = getString(R.string.start_page_slot_number, index + 3)
+            val slotUrl = slots.getOrNull(index + 2)
             val summary = if (slotUrl.isNullOrBlank()) {
                 getString(R.string.start_page_slot_empty_title)
             } else {
@@ -2463,7 +2508,7 @@ class MainActivity : AppCompatActivity() {
                 refreshStartPage()
                 Toast.makeText(
                     this,
-                    getString(R.string.start_page_slot_saved, getString(R.string.start_page_slot_number, selectedSlot + 2)),
+                    getString(R.string.start_page_slot_saved, getString(R.string.start_page_slot_number, selectedSlot + 3)),
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -2534,7 +2579,7 @@ class MainActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = (12 * density).toInt() }
             }
             textContainer.addView(MaterialTextView(this).apply {
-                text = getString(R.string.start_page_slot_number, startPageSlot + 2)
+                text = getString(R.string.start_page_slot_number, startPageSlot + 3)
                 visibility = if (startPageSlot >= 0) View.VISIBLE else View.GONE
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelMedium)
                 setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
@@ -2556,7 +2601,7 @@ class MainActivity : AppCompatActivity() {
                 textContainer.addView(MaterialTextView(this).apply {
                     text = getString(
                         R.string.bookmark_start_page_badge,
-                        getString(R.string.start_page_slot_number, startPageSlot + 2)
+                        getString(R.string.start_page_slot_number, startPageSlot + 3)
                     )
                     setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
                     setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
@@ -2648,6 +2693,9 @@ class MainActivity : AppCompatActivity() {
     private fun displayTitleForUrl(url: String): String {
         if (isYouTubeTvUrl(url)) {
             return "YouTube TV"
+        }
+        if (isPlutoTvUrl(url)) {
+            return "Pluto TV"
         }
         val host = runCatching { java.net.URI(url).host?.lowercase() }.getOrNull().orEmpty()
         val normalizedHost = host.removePrefix("www.").removePrefix("m.")
@@ -2984,7 +3032,7 @@ class MainActivity : AppCompatActivity() {
 
             repeat(2) { columnIndex ->
                 val slotIndex = rowIndex * 2 + columnIndex
-                if (slotIndex >= BrowserPreferences.MAX_START_PAGE_SITES) return@repeat
+                if (slotIndex >= slots.size) return@repeat
                 val slotUrl = slots.getOrNull(slotIndex)
                 row.addView(
                     createStartPageSlotCard(slotIndex, slotUrl).apply {
@@ -3183,8 +3231,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     },
                     onAdBlockChanged = {
+                        val adBlockEnabled = BrowserPreferences.isAdBlockEnabled(this)
+                        val popupBlockerEnabled = BrowserPreferences.isPopupBlockerEnabled(this)
                         browserTabs.forEach { tab ->
-                            tab.webView.updateAdBlock(BrowserPreferences.isAdBlockEnabled(this))
+                            tab.webView.updateAdBlock(adBlockEnabled)
+                            tab.webView.settings.javaScriptCanOpenWindowsAutomatically = !popupBlockerEnabled
                         }
                     },
                     onScaleChanged = { recreate() },
@@ -3252,6 +3303,8 @@ class MainActivity : AppCompatActivity() {
             bitmap
         } catch (_: Exception) { null }
     }
+
+
 
     companion object {
         private const val MENU_BUTTON_AUTO_HIDE_DELAY_MS = 3000L

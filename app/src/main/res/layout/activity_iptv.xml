@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface">
+
+    <!-- 1. STATE A: PLAYLIST MANAGEMENT VIEW -->
+    <LinearLayout
+        android:id="@+id/playlistViewContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="visible">
+
+        <!-- Header -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
+
+            <ImageButton
+                android:id="@+id/buttonBackToMain"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_back"
+                android:src="@drawable/arrow_back_24px"
+                app:tint="?attr/colorOnSurface" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="@string/iptv_player_title"
+                android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonAddPlaylist"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:text="@string/iptv_add_playlist"
+                app:icon="@drawable/new_window_24px" />
+        </RelativeLayout>
+
+        <!-- Loading playlists indicator -->
+        <ProgressBar
+            android:id="@+id/playlistProgressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Empty state -->
+        <TextView
+            android:id="@+id/textViewEmptyState"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:padding="32dp"
+            android:text="@string/iptv_no_playlists"
+            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:visibility="visible" />
+
+        <!-- Playlists list -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewPlaylists"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:visibility="gone"
+            tools:listitem="@layout/item_iptv_playlist" />
+    </LinearLayout>
+
+    <!-- 2. STATE B: CHANNEL SELECTION VIEW (Premium Dark Dashboard) -->
+    <LinearLayout
+        android:id="@+id/channelsViewContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#13131A"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <!-- Header -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
+
+            <ImageButton
+                android:id="@+id/buttonBackToPlaylists"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_back"
+                android:src="@drawable/arrow_back_24px"
+                app:tint="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/textViewPlaylistTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                tools:text="Canales de TV" />
+        </RelativeLayout>
+
+        <!-- Filters (Search and Categories) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp"
+            android:gravity="center_vertical">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="3"
+                android:layout_marginEnd="8dp"
+                app:hintEnabled="false"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editTextSearchChannelsMain"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/iptv_search_channels_hint"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#88FFFFFF"
+                    android:background="#33FFFFFF"
+                    android:singleLine="true"
+                    android:textSize="14sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <Spinner
+                android:id="@+id/spinnerCategoriesMain"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="2"
+                android:background="#33FFFFFF" />
+        </LinearLayout>
+
+        <!-- Channels Grid / List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewChannelsMain"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            tools:listitem="@layout/item_iptv_channel" />
+    </LinearLayout>
+
+    <!-- 3. STATE C: FULLSCREEN PLAYER VIEW -->
+    <FrameLayout
+        android:id="@+id/playerViewContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:visibility="gone">
+
+        <!-- ExoPlayer PlayerView -->
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/exoPlayerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:use_controller="true"
+            app:show_timeout="5000"
+            app:resize_mode="fit" />
+
+        <!-- Custom Player Controls Overlays -->
+        <RelativeLayout
+            android:id="@+id/playerControlsOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false">
+
+            <!-- Top bar container -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:background="@android:color/transparent"
+                android:gravity="center_vertical"
+                android:layout_alignParentTop="true">
+
+                <!-- Exit Player Button -->
+                <ImageButton
+                    android:id="@+id/buttonExitPlayer"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/arrow_back_24px"
+                    app:tint="#FFFFFF"
+                    android:contentDescription="Exit" />
+
+                <!-- Playing Channel Title -->
+                <TextView
+                    android:id="@+id/textViewPlayingChannel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="16dp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                    tools:text="Canal de prueba" />
+
+                <!-- Channel Sidebar Toggle Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonToggleSidebar"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/iptv_channels_sidebar"
+                    android:textColor="#FFFFFF"
+                    app:backgroundTint="#CC000000"
+                    app:icon="@drawable/devices_other_24px"
+                    app:iconTint="#FFFFFF" />
+            </LinearLayout>
+
+            <!-- Loading overlay for streams -->
+            <ProgressBar
+                android:id="@+id/streamProgressBar"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_centerInParent="true"
+                android:visibility="gone" />
+        </RelativeLayout>
+
+        <!-- SLIDING CHANNELS SIDEBAR (Panel Lateral) -->
+        <FrameLayout
+            android:id="@+id/channelsSidebar"
+            android:layout_width="320dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="#E61C1C23"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="8dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <!-- Sidebar Header -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:text="@string/iptv_channels_sidebar"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+
+                    <ImageButton
+                        android:id="@+id/buttonCloseSidebar"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_close"
+                        app:tint="#FFFFFF"
+                        android:contentDescription="Close Sidebar" />
+                </RelativeLayout>
+
+                <!-- Search Channels -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    app:hintEnabled="false"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextSearchChannels"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/iptv_search_channels_hint"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#88FFFFFF"
+                        android:background="#33FFFFFF"
+                        android:singleLine="true"
+                        android:textSize="14sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Category Spinner / Dropdown -->
+                <Spinner
+                    android:id="@+id/spinnerCategories"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="#33FFFFFF"
+                    android:textColor="#FFFFFF" />
+
+                <!-- Channels list -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerViewChannels"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    tools:listitem="@layout/item_iptv_channel" />
+            </LinearLayout>
+        </FrameLayout>
+    </FrameLayout>
+</FrameLayout>

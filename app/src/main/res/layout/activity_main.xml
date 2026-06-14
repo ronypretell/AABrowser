@@ -813,6 +813,50 @@
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
 
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/buttonIptvCard"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/menu_item_spacing"
+                                android:clickable="true"
+                                android:focusable="true"
+                                app:cardCornerRadius="@dimen/card_corner_radius"
+                                app:cardElevation="0dp"
+                                app:strokeWidth="1dp"
+                                app:strokeColor="?attr/colorOutlineVariant"
+                                app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="16dp"
+                                    android:minHeight="56dp">
+
+                                    <ImageView
+                                        android:layout_width="@dimen/icon_size_medium"
+                                        android:layout_height="@dimen/icon_size_medium"
+                                        android:src="@drawable/devices_other_24px"
+                                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                                    <TextView
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:layout_marginStart="16dp"
+                                        android:text="@string/iptv_menu_label"
+                                        android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@drawable/arrow_forward_24px"
+                                        app:tint="?attr/colorOnSurfaceVariant"
+                                        android:alpha="0.7" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
                             <com.google.android.material.divider.MaterialDivider
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"

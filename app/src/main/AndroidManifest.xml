@@ -98,6 +98,13 @@
             android:exported="false"
             android:theme="@style/Theme.AAVideo" />
 
+        <activity
+            android:name=".IptvActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|uiMode|layoutDirection|locale"
+            android:exported="false"
+            android:label="IPTV Player"
+            android:theme="@style/Theme.AAVideo" />
+
     </application>
 
 </manifest>

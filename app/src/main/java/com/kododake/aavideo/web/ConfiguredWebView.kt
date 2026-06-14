@@ -21,8 +21,14 @@ import android.webkit.WebViewClient
 import androidx.core.net.toUri
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import androidx.webkit.WebViewCompat
+import androidx.webkit.ProxyConfig
+import androidx.webkit.ProxyController
 import com.kododake.aavideo.R
 import com.kododake.aavideo.model.UserAgentProfile
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.KeyEvent
 
 data class BrowserCallbacks(
     val onUrlChange: (String) -> Unit = {},
@@ -65,7 +71,7 @@ fun configureWebView(
             javaScriptEnabled = true
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
-            javaScriptCanOpenWindowsAutomatically = true
+            javaScriptCanOpenWindowsAutomatically = !com.kododake.aavideo.data.BrowserPreferences.isPopupBlockerEnabled(context)
 
             setSupportMultipleWindows(true)
 
@@ -88,8 +94,28 @@ fun configureWebView(
         applyPageDarkening(allowDarkPages)
         applyUserAgent(userAgentProfile, useDesktopMode)
         setTag(R.id.webview_ad_block_tag, adBlockEnabled)
+        addJavascriptInterface(AdBlockBridge(context), "AdBlockBridge")
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            val script = com.kododake.aavideo.adblock.UnifiedAdBlocker.getDocumentStartJs()
+            WebViewCompat.addDocumentStartJavaScript(this, script, setOf("*"))
+            WebViewCompat.addDocumentStartJavaScript(this, MEDIA_LISTENER_JS, setOf("*"))
+        }
         val scale = context.resources.displayMetrics.density * 100
         setInitialScale(scale.toInt())
+        
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+            val activeProxyPort = com.kododake.aavideo.net.LocalDnsProxy.start()
+            if (activeProxyPort > 0) {
+                val proxyConfig = ProxyConfig.Builder()
+                    .addProxyRule("127.0.0.1:$activeProxyPort")
+                    .addBypassRule("localhost")
+                    .addBypassRule("127.0.0.1")
+                    .build()
+                ProxyController.getInstance().setProxyOverride(proxyConfig, { it.run() }, {
+                    android.util.Log.d("AABrowser", "WebView Proxy configurado en el puerto local $activeProxyPort")
+                })
+            }
+        }
 
         CookieManager.getInstance().also {
             it.setAcceptCookie(true)
@@ -98,14 +124,72 @@ fun configureWebView(
 
         setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
+        val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (!isPlutoTvUrl(url)) return false
+                e1 ?: return false
+                val diffX = e2.x - e1.x
+                val diffY = e2.y - e1.y
+                val threshold = 50
+                val velocityThreshold = 50
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    if (Math.abs(diffX) > threshold && Math.abs(velocityX) > velocityThreshold) {
+                        if (diffX > 0) {
+                            dispatchDpadKey(KeyEvent.KEYCODE_DPAD_LEFT)
+                        } else {
+                            dispatchDpadKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+                        }
+                        return true
+                    }
+                } else {
+                    if (Math.abs(diffY) > threshold && Math.abs(velocityY) > velocityThreshold) {
+                        if (diffY > 0) {
+                            dispatchDpadKey(KeyEvent.KEYCODE_DPAD_UP)
+                        } else {
+                            dispatchDpadKey(KeyEvent.KEYCODE_DPAD_DOWN)
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                if (!isPlutoTvUrl(url)) return false
+                dispatchDpadKey(KeyEvent.KEYCODE_DPAD_CENTER)
+                return true
+            }
+
+            private fun dispatchDpadKey(keyCode: Int) {
+                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+            }
+        })
+
+        setOnTouchListener { _, event ->
+            if (isPlutoTvUrl(url)) {
+                gestureDetector.onTouchEvent(event)
+                true
+            } else {
+                false
+            }
+        }
+
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
                 val url = uri.toString()
                 if (isYouTubeTvUrl(url)) {
                     view.applyYouTubeTvUserAgent()
+                } else if (isPlutoTvUrl(url)) {
+                    view.applyPlutoTvConfig()
                 } else {
-                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT) {
+                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT || view.settings.userAgentString == PLUTO_TV_USER_AGENT) {
                         view.restoreDefaultUserAgent()
                     }
                 }
@@ -129,8 +213,12 @@ fun configureWebView(
                     if (view.settings.userAgentString != YOUTUBE_TV_USER_AGENT) {
                         view.applyYouTubeTvUserAgent()
                     }
+                } else if (isPlutoTvUrl(stringUrl)) {
+                    if (view.settings.userAgentString != PLUTO_TV_USER_AGENT) {
+                        view.applyPlutoTvConfig()
+                    }
                 } else {
-                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT) {
+                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT || view.settings.userAgentString == PLUTO_TV_USER_AGENT) {
                         view.restoreDefaultUserAgent()
                     }
                 }
@@ -170,10 +258,9 @@ fun configureWebView(
                 if (isYouTubeTvUrl(url)) {
                     view.evaluateJavascript(YOUTUBE_TV_TOUCH_NAVIGATION_JS, null)
                 }
-                val adBlockEnabled = view.getTag(R.id.webview_ad_block_tag) as? Boolean ?: false
-                if (adBlockEnabled && url != null) {
-                    com.kododake.aavideo.adblock.YouTubeAdBlocker.getInjectionJs(url)?.let { js ->
-                        view.evaluateJavascript(js, null)
+                if (url != null) {
+                    if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                        view.evaluateJavascript(com.kododake.aavideo.adblock.UnifiedAdBlocker.getDocumentStartJs(), null)
                     }
                 }
             }
@@ -296,13 +383,77 @@ fun configureWebView(
                 }
             }
 
+            override fun onJsAlert(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: android.webkit.JsResult?
+            ): Boolean {
+                val isPopupBlockerEnabled = com.kododake.aavideo.data.BrowserPreferences.isPopupBlockerEnabled(view?.context ?: return false)
+                if (isPopupBlockerEnabled) {
+                    result?.confirm()
+                    return true
+                }
+                return super.onJsAlert(view, url, message, result)
+            }
+
+            override fun onJsConfirm(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: android.webkit.JsResult?
+            ): Boolean {
+                val isPopupBlockerEnabled = com.kododake.aavideo.data.BrowserPreferences.isPopupBlockerEnabled(view?.context ?: return false)
+                if (isPopupBlockerEnabled) {
+                    result?.confirm()
+                    return true
+                }
+                return super.onJsConfirm(view, url, message, result)
+            }
+
+            override fun onJsPrompt(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                defaultValue: String?,
+                result: android.webkit.JsPromptResult?
+            ): Boolean {
+                val isPopupBlockerEnabled = com.kododake.aavideo.data.BrowserPreferences.isPopupBlockerEnabled(view?.context ?: return false)
+                if (isPopupBlockerEnabled) {
+                    result?.confirm(defaultValue ?: "")
+                    return true
+                }
+                return super.onJsPrompt(view, url, message, defaultValue, result)
+            }
+
             override fun onCreateWindow(
                 view: WebView?,
                 isDialog: Boolean,
                 isUserGesture: Boolean,
                 resultMsg: Message?
             ): Boolean {
-                return false
+                if (view == null || resultMsg == null) return false
+                val context = view.context
+                val isPopupBlockerEnabled = com.kododake.aavideo.data.BrowserPreferences.isPopupBlockerEnabled(context)
+                if (isPopupBlockerEnabled) {
+                    return false
+                }
+                val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+                val tempWebView = WebView(context)
+                tempWebView.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean {
+                        val url = request.url.toString()
+                        view.post { view.loadUrl(url) }
+                        return true
+                    }
+                    override fun shouldOverrideUrlLoading(v: WebView, url: String): Boolean {
+                        view.post { view.loadUrl(url) }
+                        return true
+                    }
+                }
+                transport.webView = tempWebView
+                resultMsg.sendToTarget()
+                return true
             }
         }
 
@@ -453,6 +604,22 @@ fun isYouTubeTvUrl(url: String?): Boolean {
     return (host == "youtube.com" || host == "www.youtube.com" || host == "m.youtube.com" || host == "tv.youtube.com") && (path == "/tv" || path.startsWith("/tv/") || host == "tv.youtube.com")
 }
 
+fun isPlutoTvUrl(url: String?): Boolean {
+    if (url.isNullOrBlank()) return false
+    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+    val host = uri.host?.lowercase() ?: return false
+    return host == "pluto.tv" || host.endsWith(".pluto.tv")
+}
+
+const val PLUTO_TV_USER_AGENT = "Mozilla/5.0 (Linux; Android 10; Chromecast) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
+
+fun WebView.applyPlutoTvConfig() {
+    settings.userAgentString = PLUTO_TV_USER_AGENT
+    settings.javaScriptEnabled = true
+    settings.domStorageEnabled = true
+    settings.mediaPlaybackRequiresUserGesture = false
+}
+
 fun WebView.applyYouTubeTvUserAgent() {
     settings.userAgentString = YOUTUBE_TV_USER_AGENT
     settings.useWideViewPort = true
@@ -475,6 +642,8 @@ fun WebView.restoreDefaultUserAgent() {
 fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
     if (isYouTubeTvUrl(url)) {
         applyYouTubeTvUserAgent()
+    } else if (isPlutoTvUrl(url)) {
+        applyPlutoTvConfig()
     } else {
         applyUserAgent(profile, enable)
     }
@@ -484,6 +653,8 @@ fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
 fun WebView.updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) {
     if (isYouTubeTvUrl(url)) {
         applyYouTubeTvUserAgent()
+    } else if (isPlutoTvUrl(url)) {
+        applyPlutoTvConfig()
     } else {
         applyUserAgent(profile, desktop)
     }
@@ -612,11 +783,73 @@ const val MEDIA_LISTENER_JS = """
         
         if (activeElement) {
             try {
-                if (activeElement.volume < 1.0) {
-                    activeElement.volume = 1.0;
+                var isAd = activeElement.playbackRate === 16.0 || 
+                           document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay, .ytp-ad-preview-container, .ytp-ad-preview-container-modern, .ytp-ad-image-overlay, .ytp-ad-text, .ytp-ad-preview-text, .ytp-tv-ad-preview-text');
+                
+                if (!isAd && !window.location.hostname.includes("youtube.com") && !window.location.hostname.includes("youtu.be")) {
+                    var adSelectors = [
+                        '.videoAdUi', '.ima-ad-container', '.ima-controls-container',
+                        '.vjs-ad-playing', '.vjs-ad-loading', '.vjs-ad-container',
+                        '.jw-flag-ads', '.jw-ad-container', '.jw-ad-overlay',
+                        '.fluid_ad_container', '.fluid_video_wrapper_ad',
+                        '.ad-break', '.ad-indicator', '.ad-countdown', '.ad-overlay',
+                        '.pluto-ad-break-indicator', '.ad-break-indicator', '.ad-countdown-timer',
+                        '.progress-bar-ad', '[class^="ad-break"]', '[class^="ad-indicator"]',
+                        '[class^="ad-countdown"]', '[class^="ad-overlay"]',
+                        '[class*=" ad-break"]', '[class*=" ad-indicator"]',
+                        '[class*=" ad-countdown"]', '[class*=" ad-overlay"]',
+                        '.video-ads', '.ad-container', '.player-ad-overlay',
+                        '[class*="vast-ad" i]', '[class*="ima-ad" i]', '[class*="ad-player" i]',
+                        '[class*="ad-showing" i]', '[class*="ad-break" i]', '[class*="video-ad" i]',
+                        '[class*="videoAdUi" i]', '[class*="skip-button" i]', '[class*="skip-btn" i]', '[class*="skip-ad" i]'
+                    ];
+                    var container = activeElement.parentElement || document.body;
+                    for (var s = 0; s < adSelectors.length; s++) {
+                        try {
+                            var el = container.querySelector(adSelectors[s]);
+                            if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
+                                isAd = true;
+                                break;
+                            }
+                        } catch(e) {}
+                    }
+                    if (!isAd) {
+                        var elList = container.querySelectorAll('div, span, p, a, button');
+                        for (var i = 0; i < elList.length; i++) {
+                            var elItem = elList[i];
+                            if (elItem.offsetWidth === 0 && elItem.offsetHeight === 0) continue;
+                            var text = (elItem.textContent || elItem.innerText || "").trim().toLowerCase();
+                            if (
+                                /saltar\s+anuncio/i.test(text) ||
+                                /omitir\s+anuncio/i.test(text) ||
+                                /este\s+anuncio\s+terminar/i.test(text) ||
+                                /anuncio\s+terminará\s+en/i.test(text) ||
+                                /video\s+se\s+reanudará/i.test(text) ||
+                                /anuncio\s+\d+\s+de\s+\d+/i.test(text) ||
+                                /publicidad/i.test(text) ||
+                                /anuncio/i.test(text) ||
+                                /skip\s+ad/i.test(text) ||
+                                /ad\s+break/i.test(text) ||
+                                /sponsored/i.test(text) ||
+                                /patrocinado/i.test(text)
+                            ) {
+                                isAd = true;
+                                break;
+                            }
+                        }
+                    }
                 }
-                if (activeElement.muted) {
-                    activeElement.muted = false;
+
+                if (!isAd) {
+                    if (activeElement.volume < 1.0) {
+                        activeElement.volume = 1.0;
+                    }
+                    if (activeElement.muted) {
+                        activeElement.muted = false;
+                    }
+                } else {
+                    activeElement.muted = true;
+                    activeElement.volume = 0.0;
                 }
             } catch (e) {}
             
@@ -807,7 +1040,31 @@ const val MEDIA_LISTENER_JS = """
             } catch (e) {}
         }
         
-        // 5. Generic site meta-tags for artwork
+        // 5. Video Element Poster
+        if (!artworkUrl && activeElement && activeElement.tagName.toLowerCase() === 'video') {
+            var poster = activeElement.getAttribute('poster');
+            if (poster) {
+                try {
+                    artworkUrl = new URL(poster, window.location.href).href;
+                } catch (e) {
+                    artworkUrl = poster;
+                }
+            }
+        }
+        if (!artworkUrl) {
+            try {
+                var videos = document.querySelectorAll('video');
+                for (var vi = 0; vi < videos.length; vi++) {
+                    var p = videos[vi].getAttribute('poster');
+                    if (p) {
+                        artworkUrl = new URL(p, window.location.href).href;
+                        break;
+                    }
+                }
+            } catch (e) {}
+        }
+        
+        // 5b. Generic site meta-tags for artwork
         if (!artworkUrl) {
             var ogImg = document.querySelector('meta[property="og:image"]');
             if (ogImg) {
@@ -938,3 +1195,14 @@ const val TWO_FINGER_SWIPE_UP_JS = """
     }, { capture: true, passive: true });
 })();
 """
+
+class AdBlockBridge(private val context: android.content.Context) {
+    @android.webkit.JavascriptInterface
+    fun isAdBlockEnabled(): Boolean {
+        return com.kododake.aavideo.data.BrowserPreferences.isAdBlockEnabled(context)
+    }
+    @android.webkit.JavascriptInterface
+    fun isPopupBlockerEnabled(): Boolean {
+        return com.kododake.aavideo.data.BrowserPreferences.isPopupBlockerEnabled(context)
+    }
+}

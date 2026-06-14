@@ -12,6 +12,8 @@ object YouTubeAdBlocker {
         return """
             (function() {
                 let originalSpeed = 1.0;
+                let originalVolume = 1.0;
+                let wasAdShowing = false;
                 
                 function skipAds() {
                     const video = document.querySelector('video');
@@ -20,12 +22,16 @@ object YouTubeAdBlocker {
                     const adShowing = document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay, .ytp-ad-preview-container, .ytp-ad-preview-container-modern, .ytp-ad-image-overlay, .ytp-ad-text, .ytp-ad-preview-text, .ytp-tv-ad-preview-text');
                     
                     if (adShowing) {
-                        if (video.playbackRate < 10) {
+                        if (!wasAdShowing) {
+                            originalVolume = video.volume > 0 ? video.volume : (originalVolume || 1.0);
                             originalSpeed = video.playbackRate === 16 ? 1.0 : video.playbackRate;
-                            video.muted = true;
-                            video.playbackRate = 16.0;
-                            console.log('Ad detected: speeding up to 16x');
+                            wasAdShowing = true;
+                            console.log('Ad detected: storing original state (vol=' + originalVolume + ', speed=' + originalSpeed + ')');
                         }
+                        
+                        video.muted = true;
+                        video.volume = 0.0;
+                        video.playbackRate = 16.0;
                         
                         const skipButtons = [
                             '.ytp-ad-skip-button',
@@ -44,10 +50,12 @@ object YouTubeAdBlocker {
                             }
                         }
                     } else {
-                        if (video.playbackRate === 16.0) {
+                        if (wasAdShowing || video.playbackRate === 16.0) {
                             video.playbackRate = originalSpeed || 1.0;
                             video.muted = false;
-                            console.log('Ad finished: restoring speed');
+                            video.volume = originalVolume || 1.0;
+                            wasAdShowing = false;
+                            console.log('Ad finished: restoring state (vol=' + originalVolume + ', speed=' + originalSpeed + ')');
                         }
                     }
                     

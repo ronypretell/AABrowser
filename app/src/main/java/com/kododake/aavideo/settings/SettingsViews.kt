@@ -374,6 +374,41 @@ object SettingsViews {
         adBlockRow.addView(adBlockText)
         adBlockRow.addView(adBlockSwitch)
         adBlockInner.addView(adBlockRow)
+
+        val popupBlockerRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(16), 0, 0)
+        }
+        val popupBlockerText = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(12)
+            }
+        }
+        popupBlockerText.addView(TextView(context).apply {
+            text = "Bloquear anuncios emergentes"
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+            setTextColor(onSurfaceColor)
+        })
+        popupBlockerText.addView(TextView(context).apply {
+            text = "Evita que las páginas web abran ventanas emergentes y pestañas de publicidad."
+            setPadding(0, dp(4), 0, 0)
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            setTextColor(getColorFromAttr(com.google.android.material.R.attr.colorOnSurfaceVariant))
+        })
+        val popupBlockerSwitch = SwitchMaterial(context).apply {
+            isChecked = BrowserPreferences.isPopupBlockerEnabled(context)
+            setUseMaterialThemeColors(true)
+        }
+        popupBlockerSwitch.setOnCheckedChangeListener { _, isChecked ->
+            BrowserPreferences.setPopupBlockerEnabled(context, isChecked)
+            callbacks.onAdBlockChanged()
+        }
+        popupBlockerRow.addView(popupBlockerText)
+        popupBlockerRow.addView(popupBlockerSwitch)
+        adBlockInner.addView(popupBlockerRow)
+
         adBlockCard.addView(adBlockInner)
         container.addView(adBlockCard)
 

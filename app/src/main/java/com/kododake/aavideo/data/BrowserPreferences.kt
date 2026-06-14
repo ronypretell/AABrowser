@@ -41,6 +41,7 @@ object BrowserPreferences {
     private const val KEY_START_PAGE_BACKGROUND_URI = "start_page_background_uri"
     private const val KEY_HOME_PAGE_URL = "home_page_url"
     private const val KEY_AD_BLOCK_ENABLED = "ad_block_enabled"
+    private const val KEY_POPUP_BLOCKER_ENABLED = "popup_blocker_enabled"
     private const val DEFAULT_URL = "https://www.google.com"
     private const val SEARCH_TEMPLATE = "https://www.google.com/search?q=%s"
 
@@ -53,7 +54,7 @@ object BrowserPreferences {
         "https://keepandroidopen.org"
     )
 
-    const val MAX_START_PAGE_SITES = 6
+    const val MAX_START_PAGE_SITES = 8
     const val MAX_OPEN_TABS = 8
     const val MIN_GLOBAL_SCALE_PERCENT = 60
     const val MAX_GLOBAL_SCALE_PERCENT = 200
@@ -161,6 +162,18 @@ object BrowserPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_AD_BLOCK_ENABLED, enabled)
+            .apply()
+    }
+
+    fun isPopupBlockerEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_POPUP_BLOCKER_ENABLED, false)
+    }
+
+    fun setPopupBlockerEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_POPUP_BLOCKER_ENABLED, enabled)
             .apply()
     }
 
@@ -417,7 +430,7 @@ object BrowserPreferences {
 
     fun getStartPageSlots(context: Context): List<String?> {
         val slots = loadStartPageSlots(context)
-        return listOf("https://www.youtube.com/tv") + slots.map { it.ifBlank { null } }
+        return listOf("https://www.youtube.com/tv", "https://pluto.tv/") + slots.map { it.ifBlank { null } }
     }
 
     fun getStartPageSites(context: Context): List<String> {

@@ -20,3 +20,8 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 -dontobfuscate
+
+# Prevent R8 from stripping Media3 MediaSource factories loaded via reflection
+-keep class androidx.media3.exoplayer.hls.HlsMediaSource$Factory { *; }
+-keep class androidx.media3.exoplayer.dash.DashMediaSource$Factory { *; }
+-keep class androidx.media3.exoplayer.rtsp.RtspMediaSource$Factory { *; }
