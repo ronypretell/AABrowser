@@ -70,6 +70,7 @@ fun configureWebView(
         settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            databaseEnabled = true
             mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = !com.kododake.aavideo.data.BrowserPreferences.isPopupBlockerEnabled(context)
 
@@ -188,8 +189,12 @@ fun configureWebView(
                     view.applyYouTubeTvUserAgent()
                 } else if (isPlutoTvUrl(url)) {
                     view.applyPlutoTvConfig()
+                } else if (isNetflixUrl(url)) {
+                    view.applyNetflixConfig()
                 } else {
-                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT || view.settings.userAgentString == PLUTO_TV_USER_AGENT) {
+                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT || 
+                        view.settings.userAgentString == PLUTO_TV_USER_AGENT || 
+                        view.settings.userAgentString == NETFLIX_DESKTOP_USER_AGENT) {
                         view.restoreDefaultUserAgent()
                     }
                 }
@@ -217,8 +222,14 @@ fun configureWebView(
                     if (view.settings.userAgentString != PLUTO_TV_USER_AGENT) {
                         view.applyPlutoTvConfig()
                     }
+                } else if (isNetflixUrl(stringUrl)) {
+                    if (view.settings.userAgentString != NETFLIX_DESKTOP_USER_AGENT) {
+                        view.applyNetflixConfig()
+                    }
                 } else {
-                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT || view.settings.userAgentString == PLUTO_TV_USER_AGENT) {
+                    if (view.settings.userAgentString == YOUTUBE_TV_USER_AGENT || 
+                        view.settings.userAgentString == PLUTO_TV_USER_AGENT || 
+                        view.settings.userAgentString == NETFLIX_DESKTOP_USER_AGENT) {
                         view.restoreDefaultUserAgent()
                     }
                 }
@@ -620,6 +631,25 @@ fun WebView.applyPlutoTvConfig() {
     settings.mediaPlaybackRequiresUserGesture = false
 }
 
+fun isNetflixUrl(url: String?): Boolean {
+    if (url.isNullOrBlank()) return false
+    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+    val host = uri.host?.lowercase() ?: return false
+    return host == "netflix.com" || host.endsWith(".netflix.com")
+}
+
+const val NETFLIX_DESKTOP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+
+fun WebView.applyNetflixConfig() {
+    settings.userAgentString = NETFLIX_DESKTOP_USER_AGENT
+    settings.useWideViewPort = true
+    settings.loadWithOverviewMode = true
+    settings.javaScriptEnabled = true
+    settings.domStorageEnabled = true
+    settings.databaseEnabled = true
+    settings.mediaPlaybackRequiresUserGesture = false
+}
+
 fun WebView.applyYouTubeTvUserAgent() {
     settings.userAgentString = YOUTUBE_TV_USER_AGENT
     settings.useWideViewPort = true
@@ -644,6 +674,8 @@ fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
         applyYouTubeTvUserAgent()
     } else if (isPlutoTvUrl(url)) {
         applyPlutoTvConfig()
+    } else if (isNetflixUrl(url)) {
+        applyNetflixConfig()
     } else {
         applyUserAgent(profile, enable)
     }
@@ -655,6 +687,8 @@ fun WebView.updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) 
         applyYouTubeTvUserAgent()
     } else if (isPlutoTvUrl(url)) {
         applyPlutoTvConfig()
+    } else if (isNetflixUrl(url)) {
+        applyNetflixConfig()
     } else {
         applyUserAgent(profile, desktop)
     }

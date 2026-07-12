@@ -67,6 +67,9 @@ import com.kododake.aavideo.web.YOUTUBE_TV_USER_AGENT
 import com.kododake.aavideo.web.isPlutoTvUrl
 import com.kododake.aavideo.web.applyPlutoTvConfig
 import com.kododake.aavideo.web.PLUTO_TV_USER_AGENT
+import com.kododake.aavideo.web.isNetflixUrl
+import com.kododake.aavideo.web.applyNetflixConfig
+import com.kododake.aavideo.web.NETFLIX_DESKTOP_USER_AGENT
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.textview.MaterialTextView
@@ -1144,8 +1147,12 @@ class MainActivity : AppCompatActivity() {
                     applyYouTubeTvUserAgent()
                 } else if (isPlutoTvUrl(url)) {
                     applyPlutoTvConfig()
+                } else if (isNetflixUrl(url)) {
+                    applyNetflixConfig()
                 } else {
-                    if (settings.userAgentString == YOUTUBE_TV_USER_AGENT || settings.userAgentString == PLUTO_TV_USER_AGENT) {
+                    if (settings.userAgentString == YOUTUBE_TV_USER_AGENT || 
+                        settings.userAgentString == PLUTO_TV_USER_AGENT || 
+                        settings.userAgentString == NETFLIX_DESKTOP_USER_AGENT) {
                         restoreDefaultUserAgent()
                     }
                 }
@@ -2696,6 +2703,9 @@ class MainActivity : AppCompatActivity() {
         }
         if (isPlutoTvUrl(url)) {
             return "Pluto TV"
+        }
+        if (isNetflixUrl(url)) {
+            return "Netflix"
         }
         val host = runCatching { java.net.URI(url).host?.lowercase() }.getOrNull().orEmpty()
         val normalizedHost = host.removePrefix("www.").removePrefix("m.")

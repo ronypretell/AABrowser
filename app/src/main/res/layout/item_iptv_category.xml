@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="6dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp"
+    app:cardBackgroundColor="#1E1E2A">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
+
+        <!-- Category Icon -->
+        <ImageView
+            android:id="@+id/imageViewCategoryIcon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_live_tv_24px"
+            app:tint="#8B5CF6"
+            android:scaleType="centerInside"
+            android:contentDescription="Category icon" />
+
+        <!-- Category Name -->
+        <TextView
+            android:id="@+id/textViewCategoryName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="15sp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            tools:text="Sports" />
+
+        <!-- Channel Count -->
+        <TextView
+            android:id="@+id/textViewCategoryCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#88FFFFFF"
+            android:textSize="13sp"
+            android:layout_marginStart="8dp"
+            tools:text="45" />
+
+        <!-- Arrow -->
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/arrow_forward_24px"
+            app:tint="#55FFFFFF"
+            android:contentDescription="Navigate"
+            android:scaleType="centerInside" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

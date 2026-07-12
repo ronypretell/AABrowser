@@ -24,13 +24,39 @@
             android:layout_toStartOf="@+id/buttonDeletePlaylist"
             android:layout_centerVertical="true">
 
-            <TextView
-                android:id="@+id/textViewPlaylistName"
+            <!-- Playlist Name Row with Type Badge -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/textViewPlaylistName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface"
+                    android:ellipsize="end"
+                    android:maxLines="1" />
+
+                <!-- Type Badge (M3U or Xtream) -->
+                <TextView
+                    android:id="@+id/textViewPlaylistType"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/drag_handle_background" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/textViewPlaylistUrl"

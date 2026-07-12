@@ -330,4 +330,498 @@
             </LinearLayout>
         </FrameLayout>
     </FrameLayout>
+
+    <!-- 4. STATE D: XTREAM DASHBOARD (Live TV / Movies / Series) -->
+    <LinearLayout
+        android:id="@+id/xtreamDashboardContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#13131A"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <!-- Header -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
+
+            <ImageButton
+                android:id="@+id/buttonBackFromDashboard"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_back"
+                android:src="@drawable/arrow_back_24px"
+                app:tint="#FFFFFF" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:orientation="vertical"
+                android:gravity="center_horizontal">
+
+                <TextView
+                    android:id="@+id/textViewXtreamProfileName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    tools:text="My IPTV" />
+
+                <TextView
+                    android:id="@+id/textViewXtreamUserInfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                    android:textColor="#88FFFFFF"
+                    android:layout_marginTop="2dp"
+                    tools:text="User: admin | Active" />
+            </LinearLayout>
+        </RelativeLayout>
+
+        <!-- Dashboard Cards -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="24dp">
+
+            <!-- Live TV Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardLiveTv"
+                android:layout_width="0dp"
+                android:layout_height="180dp"
+                android:layout_weight="1"
+                android:layout_margin="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#1A237E">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp">
+
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:src="@drawable/ic_live_tv_24px"
+                        app:tint="#FFFFFF"
+                        android:contentDescription="Live TV" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/iptv_live_tv"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginTop="12dp" />
+
+                    <TextView
+                        android:id="@+id/textViewLiveTvCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#AAFFFFFF"
+                        android:textSize="12sp"
+                        android:layout_marginTop="4dp"
+                        tools:text="250 channels" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Movies Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardMovies"
+                android:layout_width="0dp"
+                android:layout_height="180dp"
+                android:layout_weight="1"
+                android:layout_margin="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#4A148C">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp">
+
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:src="@drawable/ic_movie_24px"
+                        app:tint="#FFFFFF"
+                        android:contentDescription="Movies" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/iptv_movies"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginTop="12dp" />
+
+                    <TextView
+                        android:id="@+id/textViewMoviesCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#AAFFFFFF"
+                        android:textSize="12sp"
+                        android:layout_marginTop="4dp"
+                        tools:text="1.2K movies" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Series Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardSeries"
+                android:layout_width="0dp"
+                android:layout_height="180dp"
+                android:layout_weight="1"
+                android:layout_margin="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#B71C1C">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp">
+
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:src="@drawable/ic_series_24px"
+                        app:tint="#FFFFFF"
+                        android:contentDescription="Series" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/iptv_series"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginTop="12dp" />
+
+                    <TextView
+                        android:id="@+id/textViewSeriesCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#AAFFFFFF"
+                        android:textSize="12sp"
+                        android:layout_marginTop="4dp"
+                        tools:text="300 series" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+
+        <!-- Server Info Bar -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#1E1E2A">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/info_24px"
+                    app:tint="#8B5CF6"
+                    android:contentDescription="Info" />
+
+                <TextView
+                    android:id="@+id/textViewXtreamExpiry"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:textColor="#AAFFFFFF"
+                    android:textSize="12sp"
+                    tools:text="Expires: 2025-12-31" />
+
+                <TextView
+                    android:id="@+id/textViewXtreamConnections"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#AAFFFFFF"
+                    android:textSize="12sp"
+                    tools:text="Connections: 1 / 2" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Loading indicator for dashboard -->
+        <ProgressBar
+            android:id="@+id/xtreamDashboardProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- 5. STATE E: CATEGORY LIST VIEW -->
+    <LinearLayout
+        android:id="@+id/categoryListContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#13131A"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <!-- Header -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp">
+
+            <ImageButton
+                android:id="@+id/buttonBackFromCategories"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_back"
+                android:src="@drawable/arrow_back_24px"
+                app:tint="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/textViewCategoryTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                tools:text="Live TV" />
+        </RelativeLayout>
+
+        <!-- Search Categories -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:hintEnabled="false"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/editTextSearchCategories"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/iptv_search_channels_hint"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#88FFFFFF"
+                android:background="#33FFFFFF"
+                android:singleLine="true"
+                android:textSize="14sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- "All Channels" button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonAllChannels"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/iptv_all_channels"
+            app:backgroundTint="#2A2A3A"
+            android:textColor="#FFFFFF"
+            app:icon="@drawable/devices_other_24px"
+            app:iconTint="#8B5CF6" />
+
+        <!-- Category RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewCategories"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            tools:listitem="@layout/item_iptv_category" />
+
+        <ProgressBar
+            android:id="@+id/categoryProgressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- 6. STATE F: SERIES DETAIL VIEW -->
+    <LinearLayout
+        android:id="@+id/seriesDetailContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#13131A"
+        android:visibility="gone">
+
+        <!-- Series Header with back button -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp">
+
+            <ImageButton
+                android:id="@+id/buttonBackFromSeriesDetail"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_back"
+                android:src="@drawable/arrow_back_24px"
+                app:tint="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/textViewSeriesTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:ellipsize="end"
+                android:maxLines="1"
+                tools:text="Breaking Bad" />
+        </RelativeLayout>
+
+        <!-- Series Info Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="12dp">
+
+            <!-- Cover Image -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="120dp"
+                android:layout_height="170dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp">
+
+                <ImageView
+                    android:id="@+id/imageViewSeriesCover"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="Series cover"
+                    android:background="#22FFFFFF" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Series Details -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/textViewSeriesGenre"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#8B5CF6"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    tools:text="Drama, Crime" />
+
+                <TextView
+                    android:id="@+id/textViewSeriesRating"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#FFC107"
+                    android:textSize="14sp"
+                    tools:text="★ 9.5" />
+
+                <TextView
+                    android:id="@+id/textViewSeriesPlot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="#AAFFFFFF"
+                    android:textSize="12sp"
+                    android:maxLines="5"
+                    android:ellipsize="end"
+                    tools:text="A high school chemistry teacher diagnosed with terminal lung cancer..." />
+
+                <TextView
+                    android:id="@+id/textViewSeriesCast"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="#66FFFFFF"
+                    android:textSize="11sp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    tools:text="Bryan Cranston, Aaron Paul" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Season Tabs -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupSeasons"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:singleSelection="true"
+                app:selectionRequired="true" />
+        </HorizontalScrollView>
+
+        <!-- Episodes List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewEpisodes"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="8dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:clipToPadding="false" />
+
+        <ProgressBar
+            android:id="@+id/seriesDetailProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+    </LinearLayout>
 </FrameLayout>
+
